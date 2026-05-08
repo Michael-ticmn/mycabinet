@@ -15,15 +15,6 @@ This repo is a monorepo:
 - [ARCHITECTURE.md](ARCHITECTURE.md) — one-page picture of how a request travels from phone → Supabase → watcher → Gemini → back
 - [docs-pdf/architecture.pdf](docs-pdf/architecture.pdf) — colored, printable single-page PDF. Source: [docs-pdf/architecture.html](docs-pdf/architecture.html); regenerate with [`docs-pdf/build.sh`](docs-pdf/build.sh) once Cabinet copy is settled.
 
-## Planning docs
-
-- [PLAN.md](PLAN.md) — fork plan from mycellar, naming map, taxonomy, schema deltas
-- [STRATEGY.md](STRATEGY.md) — direction, decisions, constraints (legacy mycellar text; partial rebrand)
-- [BUILD_SPEC.md](BUILD_SPEC.md) — technical plan (legacy mycellar text; partial rebrand)
-- [CURRENT_STATE.md](CURRENT_STATE.md) — snapshot of where things stand
-- [BUILD_LOG.md](BUILD_LOG.md) — append-only log of mycellar's work sessions, kept for history
-- [HANDOFF_QUEUE.md](HANDOFF_QUEUE.md) — pending tasks between Chat / Code / owner
-
 ## Spirit taxonomy
 
 Categories, sub-types, regions, and per-category maturation guidance live in [`docs/js/spirit-types.js`](docs/js/spirit-types.js). Categories: bourbon, rye, scotch, irish_whiskey, japanese_whisky, world_whisky, tequila, mezcal, agave_other, rum, cognac, armagnac, brandy_other, gin, vodka, liqueur, american_whiskey_other, other. The same module powers the Add form, filter chips, and the Pour Tonight tier groupings.
@@ -34,7 +25,7 @@ Cabinet calls the Google Gemini API directly (the watcher's old `claude --print`
 
 ## Where to start
 
-If you're picking this up: read PLAN.md, then this README, then CURRENT_STATE.md for what's queued next. To run locally you need a Cabinet Supabase project (separate from cellar27); apply [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), drop the URL + anon key into [`docs/config.local.js`](docs/config.local.js) and the URL + service role key into [`watcher/.env`](watcher/.env.example), seed [`cabinet_allowed_users`](supabase/migrations/0001_init.sql) with your auth user id, and start the watcher.
+To run locally you need a Cabinet Supabase project (separate from cellar27); apply [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), drop the URL + anon key into [`docs/config.local.js`](docs/config.local.js) and the URL + service role key into [`watcher/.env`](watcher/.env.example), seed `cabinet_allowed_users` with your auth user id, and start the watcher.
 
 ## Building the frontend bundle
 
