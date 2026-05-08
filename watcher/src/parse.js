@@ -1,4 +1,4 @@
-// Parse Claude Code's response files. Tolerant of formatting drift.
+// Parse the LLM's response files. Tolerant of formatting drift.
 
 function splitFrontmatter(text) {
   if (!text.startsWith('---')) return { frontmatter: {}, body: text };

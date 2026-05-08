@@ -1,9 +1,9 @@
 {
-  "name": "cellar27-watcher",
+  "name": "cabinet-watcher",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Bridges Supabase Realtime ↔ Claude Code file-drop folder for cellar27.",
+  "description": "Bridges Supabase Realtime ↔ direct LLM API calls for the Cabinet hard-spirits app.",
   "engines": {
     "node": ">=20"
   },

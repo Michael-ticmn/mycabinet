@@ -7,7 +7,7 @@ import { CONFIG } from './config.js';
 import { renderPairingRequest, renderScanRequest } from './render.js';
 import { getWeather } from './weather.js';
 import { parsePairingResponse, parseScanResponse } from './parse.js';
-import { invokeBridgeAgent } from './agent.js';
+import { runBridgeAgent } from './agent.js';
 import { denyReason } from './policy.js';
 import { notify } from './notify.js';
 
@@ -45,7 +45,8 @@ subscribeScanRequests();
 watchResponses();
 sweepTimer = setInterval(sweepStaleClaims, 120_000);
 
-log('cellar27-watcher running. Bridge dir:', CONFIG.bridgeDir);
+log('cabinet-watcher running. Bridge dir:', CONFIG.bridgeDir);
+log(`LLM primary: ${CONFIG.llmModelPrimary}; fallbacks: ${CONFIG.llmModelFallbacks.join(', ') || '(none)'}`);
 
 // ───────────────────────── setup ─────────────────────────
 
@@ -156,9 +157,9 @@ async function pickUp(table, row) {
     }).eq('id', row.id).eq('status', 'pending');
     notify({
       key: `policy:${row.user_id}`,
-      subject: `cellar27 — limit hit (${row.user_id.slice(0, 8)})`,
+      subject: `cabinet — limit hit (${row.user_id.slice(0, 8)})`,
       body: [
-        `User ${row.user_id} hit a watcher-side limit on cellar27.`,
+        `User ${row.user_id} hit a watcher-side limit on cabinet.`,
         ``,
         `Reason: ${denied}`,
         `Time:   ${new Date().toISOString()}`,
@@ -169,7 +170,7 @@ async function pickUp(table, row) {
         `      → in-memory window. Restart the watcher to clear it,`,
         `        or raise WATCHER_RATE_LIMIT_PER_HOUR in watcher/.env.`,
         `  - "user X not on allowlist"`,
-        `      → only on the allowlist when added to cellar27_allowed_users.`,
+        `      → only on the allowlist when added to cabinet_allowed_users.`,
         ``,
         `See docs/SECURITY.md for tuning options.`,
       ].join('\n'),
@@ -219,7 +220,7 @@ async function pickUp(table, row) {
     if (claimed.intent === 'enrich' && claimed.context?.bottle_id) {
       const { data, error: bErr } = await sb
         .from('bottles')
-        .select('id, producer, wine_name, varietal, blend_components, vintage, region, country, style, sweetness, body, drink_window_start, drink_window_end, notes')
+        .select('id, producer, expression_name, category, sub_type, spirit_type, age_statement, release_year, region, country, mash_bill, proof, cask_type, cask_strength, single_barrel, finish, sweetness, intensity, peak_window_start, peak_window_end, notes')
         .eq('id', claimed.context.bottle_id)
         .maybeSingle();
       if (bErr) throw bErr;
@@ -233,15 +234,17 @@ async function pickUp(table, row) {
   }
 
   if (reqPath) {
-    // Global daily ceiling: refuse to spawn if we're at cap. Atomic upsert
-    // in Postgres (cellar27_try_record_spawn) so two watchers / parallel
-    // requests can't race past the limit.
-    const { data: allowed, error: ceilErr } = await sb.rpc('cellar27_try_record_spawn', {
-      p_max: CONFIG.maxClaudeCallsPerDay,
+    // Global daily ceiling: refuse to dispatch if we're at cap. Atomic
+    // upsert in Postgres (cabinet_try_record_spawn) so two watchers /
+    // parallel requests can't race past the limit. The function name
+    // says "spawn" for back-compat with the legacy schema; semantically
+    // it's now "record one LLM call".
+    const { data: allowed, error: ceilErr } = await sb.rpc('cabinet_try_record_spawn', {
+      p_max: CONFIG.maxLlmCallsPerDay,
     });
     if (ceilErr) {
       err('try_record_spawn:', ceilErr);
-      // Fail closed: if we can't talk to Postgres, don't spawn either.
+      // Fail closed: if we can't talk to Postgres, don't dispatch either.
       await sb.from(table).update({
         status: 'error',
         error_message: `ceiling check failed: ${ceilErr.message}`,
@@ -250,36 +253,38 @@ async function pickUp(table, row) {
       return;
     }
     if (allowed !== true) {
-      log(`DAILY CEILING REACHED (${CONFIG.maxClaudeCallsPerDay}); refusing to spawn for ${table}.${claimed.id}`);
+      log(`DAILY CEILING REACHED (${CONFIG.maxLlmCallsPerDay}); refusing to dispatch for ${table}.${claimed.id}`);
       await sb.from(table).update({
         status: 'error',
-        error_message: `Daily AI capacity reached (${CONFIG.maxClaudeCallsPerDay}). Resets at midnight UTC.`,
+        error_message: `Daily AI capacity reached (${CONFIG.maxLlmCallsPerDay}). Resets at midnight UTC.`,
       }).eq('id', claimed.id);
       notify({
         key: 'daily-ceiling',
-        subject: `cellar27 — daily Claude ceiling reached (${CONFIG.maxClaudeCallsPerDay})`,
+        subject: `cabinet — daily LLM ceiling reached (${CONFIG.maxLlmCallsPerDay})`,
         body: [
-          `cellar27 has hit the global daily Claude-call ceiling.`,
+          `cabinet has hit the global daily LLM-call ceiling.`,
           ``,
-          `Cap:    ${CONFIG.maxClaudeCallsPerDay}`,
+          `Cap:    ${CONFIG.maxLlmCallsPerDay}`,
           `Time:   ${new Date().toISOString()}`,
           `Table:  ${table}`,
           `User:   ${claimed.user_id}`,
           ``,
           `Resets at UTC midnight. To allow more today:`,
-          `  1) Bump MAX_CLAUDE_CALLS_PER_DAY in watcher/.env`,
-          `  2) update cellar27_watcher_metrics set spawn_count = 0`,
+          `  1) Bump MAX_LLM_CALLS_PER_DAY in watcher/.env`,
+          `  2) update cabinet_watcher_metrics set spawn_count = 0`,
           `       where metric_date = current_date;`,
           `  3) Restart the watcher.`,
           ``,
-          `If this looks unexpected, check cellar27_audit_log (if enabled)`,
-          `or scan logs for a runaway loop. See docs/SECURITY.md.`,
+          `If this looks unexpected, check logs for a runaway loop.`,
+          `See docs/SECURITY.md.`,
         ].join('\n'),
       }).catch((e) => err('notify ceiling:', e));
       try { await unlink(reqPath); } catch { /* best-effort */ }
       return;
     }
-    invokeBridgeAgent(reqPath);
+    // Run the LLM round-trip and write the response file. chokidar in
+    // watchResponses() picks it up and ingests it back into Postgres.
+    runBridgeAgent(reqPath).catch((e) => err(`runBridgeAgent failed for ${reqPath}:`, e));
   }
 }
 
@@ -386,12 +391,12 @@ async function archive(reqFileName, responsePath) {
 
 // ───────────────────────── stale-claim sweep ─────────────────────────
 
-// Calls cellar27_sweep_stale_claims in Postgres, which atomically resets
+// Calls cabinet_sweep_stale_claims in Postgres, which atomically resets
 // timed-out 'picked_up' rows to 'pending' (up to 2 retries) or marks them
 // 'error'. For each row sent back to 'pending' we re-pick it up here,
 // since INSERT-only realtime subscriptions don't fire on UPDATE.
 async function sweepStaleClaims() {
-  const { data, error } = await sb.rpc('cellar27_sweep_stale_claims', {
+  const { data, error } = await sb.rpc('cabinet_sweep_stale_claims', {
     p_timeout_minutes: CONFIG.timeoutMinutes,
     p_max_retries: 2,
   });
@@ -454,9 +459,9 @@ async function fatalAndExit(reason, body) {
     await Promise.race([
       notify({
         key: `watcher-fatal:${reason}`,
-        subject: `cellar27 watcher died (${reason}) on ${HOST}`,
+        subject: `cabinet watcher died (${reason}) on ${HOST}`,
         body: [
-          `The cellar27 watcher on ${HOST} hit a fatal error and exited.`,
+          `The cabinet watcher on ${HOST} hit a fatal error and exited.`,
           ``,
           `Reason: ${reason}`,
           `Time:   ${new Date().toISOString()}`,

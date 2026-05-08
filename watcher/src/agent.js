@@ -1,114 +1,114 @@
-// Spawn a fresh `claude --print` session per request.
+// Inference driver. Reads the rendered request markdown, routes it through
+// the LLM provider chain in llm.js, and writes the response to the path in
+// the request's `respond_to` frontmatter. chokidar in index.js then ingests
+// it into Postgres exactly the same way it did when this was a `claude
+// --print` spawn — that side of the pipe stays unchanged.
 //
-// Why a new process per request rather than a long-lived session: simpler
-// failure model, no session-state drift between requests, and concurrent
-// requests get parallel agents for free. Trade-off is per-call startup
-// cost (a couple of seconds) — acceptable since reasoning takes 10–30s.
+// The rename from `invokeBridgeAgent` to `runBridgeAgent` is deliberate:
+// the old name implied "spawn a process"; the new flow is a synchronous-
+// looking HTTP round-trip you can await.
 
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, isAbsolute } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { extname } from 'node:path';
 import { CONFIG } from './config.js';
+import { runInference } from './llm.js';
 
 const ts = () => new Date().toISOString();
 const log = (...a) => console.log(ts(), '[agent]', ...a);
 const err = (...a) => console.error(ts(), '[agent]', ...a);
 
-// Don't hand watcher secrets (SUPABASE_SERVICE_ROLE_KEY, SMTP_PASS, etc.)
-// to the spawned Claude. Only pass vars Claude actually needs: PATH for
-// resolving the binary, HOME / USERPROFILE for the OAuth keychain, plus
-// the Windows shell essentials so .cmd shims work.
-const ENV_ALLOW = [
-  'PATH', 'HOME', 'USERPROFILE',
-  'APPDATA', 'LOCALAPPDATA',
-  'USERNAME', 'USER', 'LOGNAME',
-  'TEMP', 'TMP', 'TMPDIR',
-  'SystemRoot', 'SYSTEMROOT', 'SystemDrive', 'ComSpec', 'PATHEXT',
-  'LANG', 'LC_ALL', 'LC_CTYPE',
-  'TERM', 'COLORTERM',
-];
+// Pull a single value out of a YAML-ish frontmatter block by key.
+// Tolerant of optional quoting and trailing whitespace.
+function frontmatterField(text, key) {
+  if (!text.startsWith('---')) return null;
+  const end = text.indexOf('\n---', 3);
+  if (end === -1) return null;
+  const fm = text.slice(3, end);
+  const re = new RegExp(`^\\s*${key}\\s*:\\s*(.+?)\\s*$`, 'm');
+  const m = fm.match(re);
+  if (!m) return null;
+  return m[1].replace(/^["']|["']$/g, '').trim();
+}
 
-function filteredEnv() {
-  const out = {};
-  for (const k of ENV_ALLOW) {
-    if (process.env[k] !== undefined) out[k] = process.env[k];
+// Extract local image paths the request references (only present for scan
+// requests). render.js writes them as `- **<label>**: \`<absolute path>\``
+// inside the ## Images section.
+function imagePathsFromRequest(text) {
+  const start = text.indexOf('## Images');
+  if (start === -1) return [];
+  const end = text.indexOf('\n## ', start + 1);
+  const block = text.slice(start, end === -1 ? undefined : end);
+  const out = [];
+  const re = /^-\s+\*\*([^*]+)\*\*:\s+`([^`]+)`/gm;
+  let m;
+  while ((m = re.exec(block)) !== null) {
+    out.push({ label: m[1].trim(), path: m[2].trim() });
   }
   return out;
 }
 
-// Resolve CONFIG.claudeBin to an absolute path. On Windows, npm-installed
-// CLIs are .cmd shims (e.g. claude.cmd); spawning by bare name without
-// shell:true fails. We previously worked around this by passing
-// shell:true, but Node's DEP0190 deprecates that combo (shell-injection
-// risk on the concatenated arg string). Resolve the .cmd path explicitly
-// once, then spawn it directly with shell:false. No string concat = no
-// deprecation, no escaping concerns.
-let _resolvedBin = null;
-function resolveBin() {
-  if (_resolvedBin) return _resolvedBin;
-  const bin = CONFIG.claudeBin;
-  if (isAbsolute(bin) && existsSync(bin)) return (_resolvedBin = bin);
-  const isWin = process.platform === 'win32';
-  const exts = isWin ? (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD').split(';') : [''];
-  const sep  = isWin ? ';' : ':';
-  for (const dir of (process.env.PATH || '').split(sep)) {
-    if (!dir) continue;
-    for (const ext of exts) {
-      const candidate = join(dir, bin + ext);
-      if (existsSync(candidate)) return (_resolvedBin = candidate);
-    }
-  }
-  // Fall back to the bare name; spawn will surface ENOENT if it can't
-  // find it. This keeps the failure mode visible rather than silent.
-  return (_resolvedBin = bin);
-}
-
-export function invokeBridgeAgent(requestFilePath) {
+export async function runBridgeAgent(requestFilePath) {
   if (!CONFIG.autoInvoke) {
-    log(`auto-invoke disabled; leaving ${requestFilePath} for manual bridge agent`);
+    log(`auto-invoke disabled; leaving ${requestFilePath} for manual processing`);
     return;
   }
 
-  const prompt = `A cellar27 bridge request file is at:
-${requestFilePath}
+  let prompt;
+  try {
+    prompt = await readFile(requestFilePath, 'utf8');
+  } catch (e) {
+    err(`could not read request: ${e.message}`);
+    throw e;
+  }
 
-Read that file. It contains frontmatter (with a respond_to path you must write the response to) plus Task and Response format sections that describe what to produce. Write your response file at the path given in the respond_to frontmatter field, using the exact response format described in the request. Do not move or delete the request file — the watcher handles archival. If you can't fulfill the request for any reason, still write a response file: include the request_id from the request's frontmatter, explain the problem in the Narrative section, and use an empty Recommendations list (or null fields for scan).`;
+  const respondTo = frontmatterField(prompt, 'respond_to');
+  if (!respondTo) {
+    throw new Error(`no respond_to in frontmatter of ${requestFilePath}`);
+  }
 
-  // Note: do NOT pass --bare — it disables keychain reads, which means the
-  // spawned claude has no auth and exits with "Please run /login". Without
-  // --bare, claude inherits the user's normal OAuth session.
-  const args = [
-    '--print',
-    '--permission-mode', 'acceptEdits',
-    '--no-session-persistence',
-  ];
+  // Load image bytes for any local paths referenced in the request. Only
+  // scan requests have them; pairing requests get an empty array.
+  const refs = imagePathsFromRequest(prompt);
+  const images = await Promise.all(refs.map(async (ref) => {
+    try {
+      const bytes = await readFile(ref.path);
+      return { label: ref.label, path: ref.path, bytes };
+    } catch (e) {
+      err(`could not read image ${ref.path}: ${e.message}`);
+      return null;
+    }
+  })).then((arr) => arr.filter(Boolean));
 
-  const bin = resolveBin();
-  log(`spawning ${bin} for ${requestFilePath}`);
-  // Why shell:true on Windows despite DEP0190:
-  //   Node 24 refuses to spawn .cmd / .bat files directly (CVE-2024-27980
-  //   hardening) — without shell:true the call fails with EINVAL. npm
-  //   installs the `claude` CLI as a .cmd shim on Windows, so we have to
-  //   route through cmd.exe.
-  //   DEP0190 warns because shell:true with args concatenates them into
-  //   the shell command line without escaping, which is a shell-injection
-  //   risk *if any arg comes from user input*. In our case `args` is the
-  //   four hard-coded strings below (no dynamic content reaches it ever),
-  //   so the deprecation's reasoning doesn't apply. The warning is noise
-  //   for our usage pattern.
-  const proc = spawn(bin, args, {
-    cwd: CONFIG.bridgeDir,
-    shell: process.platform === 'win32',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: filteredEnv(),
-  });
+  log(`inferring for ${requestFilePath}${images.length ? ` (+${images.length} image${images.length === 1 ? '' : 's'})` : ''}`);
 
-  proc.stdin.write(prompt);
-  proc.stdin.end();
+  let result;
+  try {
+    result = await runInference(prompt, images);
+  } catch (e) {
+    err(`inference failed: ${e.message}`);
+    // Surface a usable response file so chokidar still ingests something
+    // and the phone gets an error narrative instead of timing out. The
+    // request_id on the request file matches the one in the frontmatter
+    // we'd be expected to echo.
+    const requestId = frontmatterField(prompt, 'request_id') || '<unknown>';
+    const fallback = `---
+request_id: ${requestId}
+completed: ${ts()}
+---
 
-  // Mirror agent output into watcher logs (prefixed) so it's all in one place.
-  proc.stdout.on('data', (d) => process.stdout.write(d.toString().replace(/^/gm, '[claude] ')));
-  proc.stderr.on('data', (d) => process.stderr.write(d.toString().replace(/^/gm, '[claude] ')));
-  proc.on('exit', (code) => log(`claude exited code=${code} for ${requestFilePath}`));
-  proc.on('error', (e) => err(`spawn error: ${e.message}`));
+## Recommendations
+
+## Narrative
+The Master of Spirits could not generate a response. ${e.message}
+`;
+    await writeFile(respondTo, fallback, 'utf8');
+    return;
+  }
+
+  await writeFile(respondTo, result.text, 'utf8');
+  log(`wrote ${respondTo} via ${result.model}`);
 }
+
+// Back-compat alias so any caller still wired to the old name keeps working
+// during the transition. (index.js will be updated to call the new name.)
+export const invokeBridgeAgent = runBridgeAgent;
