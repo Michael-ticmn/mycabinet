@@ -5,7 +5,11 @@
 // in the Supabase project. The URL is also public. NEVER put the
 // service_role key here — that one bypasses RLS and belongs only in
 // watcher/.env.
-window.CELLAR_CONFIG = {
-  SUPABASE_URL: 'https://fksvvymeqvohyaestupo.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrc3Z2eW1lcXZvaHlhZXN0dXBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MDcwMjgsImV4cCI6MjA5Mjk4MzAyOH0.PLngWivZr-qPerqtZUwHpRarx9ipzANV_GJgyz7YwGM',
+//
+// Cabinet uses its own Supabase project (separate from mycellar). Until
+// the project is provisioned, these are placeholders — fill them in
+// (or copy config.local.example.js → config.local.js) before running.
+window.CABINET_CONFIG = {
+  SUPABASE_URL: 'https://YOUR-CABINET-PROJECT-REF.supabase.co',
+  SUPABASE_ANON_KEY: 'YOUR-CABINET-ANON-KEY',
 };

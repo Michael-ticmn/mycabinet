@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1a0f0f" />
+  <meta name="theme-color" content="#15110a" />
   <!-- Strip the URL fragment from outbound Referer headers so guest tokens
-       in #/guest/<token> don't leak to any external link a sommelier
+       in #/guest/<token> don't leak to any external link a Master-of-Spirits
        response might include. -->
   <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <title>cellar27</title>
+  <title>Cabinet</title>
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest" />
@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" href="icon.svg" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="cellar27" />
+  <meta name="apple-mobile-web-app-title" content="Cabinet" />
   <meta name="mobile-web-app-capable" content="yes" />
 
   <link rel="stylesheet" href="css/styles.css" />
@@ -43,7 +43,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a href="#/cellar" class="brand">cellar<span class="num">27</span><span class="version" id="app-version" aria-label="App version"></span></a>
+    <a href="#/cabinet" class="brand">Cabinet<span class="version" id="app-version" aria-label="App version"></span></a>
     <nav>
       <a href="#/manage" data-route="manage" aria-label="Manage" title="Manage">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -71,7 +71,7 @@
           </g>
         </svg>
       </a>
-      <a href="#/drink-now" data-route="drink-now" aria-label="Drink now" title="Drink now">
+      <a href="#/pour-tonight" data-route="pour-tonight" aria-label="Pour tonight" title="Pour tonight">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
                 d="M7 3 h10 l-1.2 7a4.8 4.8 0 0 1 -7.6 0 z M12 14.8 V20 M8.5 20 h7" />
@@ -109,8 +109,8 @@
 
   <section id="auth-view" class="auth-view">
     <div class="auth-card">
-      <h1>cellar<span class="num">27</span></h1>
-      <p class="muted">Personal cellar. Sign in to continue.</p>
+      <h1>Cabinet</h1>
+      <p class="muted">Personal spirits cabinet. Sign in to continue.</p>
       <form id="signin-form">
         <label>Email <input name="email" type="email" autocomplete="email" required /></label>
         <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>

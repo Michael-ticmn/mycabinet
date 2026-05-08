@@ -32,11 +32,11 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 // ── Routing (hash-based, supports `bottle/<id>`) ──────────────────
-const ROUTES = ['cellar', 'add', 'edit', 'pairing', 'flight', 'planned', 'drink-now', 'manage', 'scan', 'bottle', 'guest', 'share'];
+const ROUTES = ['cabinet', 'add', 'edit', 'pairing', 'flight', 'planned', 'pour-tonight', 'manage', 'scan', 'bottle', 'guest', 'share'];
 function parseHash() {
   const h = location.hash.replace(/^#\/?/, '');
   const [route, ...params] = h.split('/');
-  return { route: ROUTES.includes(route) ? route : 'cellar', params };
+  return { route: ROUTES.includes(route) ? route : 'cabinet', params };
 }
 // Cancel any in-flight view fetch when a new one starts so a slow load
 // can't overwrite the view the user has since navigated to.
@@ -96,10 +96,10 @@ async function render(providedSession) {
 
 async function mountView(route, params = []) {
   switch (route) {
-    case 'cellar':     return mountCellar();
-    case 'add':        return mountAddBottle();
-    case 'edit':       return mountAddBottle(params[0]);
-    case 'drink-now':  return mountDrinkNow();
+    case 'cabinet':       return mountCabinet();
+    case 'add':           return mountAddBottle();
+    case 'edit':          return mountAddBottle(params[0]);
+    case 'pour-tonight':  return mountPourTonight();
     case 'pairing':    return mountPairing();
     case 'flight':     return mountFlight();
     case 'planned':    return mountPlanned(params[0]);
@@ -191,7 +191,7 @@ async function mountShare() {
 
 // ── Guest activity (owner-side feed of guest_messages) ────────────
 
-const LAST_SEEN_GUEST_ACTIVITY_KEY = 'cellar27.lastSeenGuestActivity';
+const LAST_SEEN_GUEST_ACTIVITY_KEY = 'cabinet.lastSeenGuestActivity';
 function getLastSeenGuestActivity(linkId) {
   try { return localStorage.getItem(`${LAST_SEEN_GUEST_ACTIVITY_KEY}.${linkId}`) || null; }
   catch { return null; }
@@ -490,7 +490,7 @@ async function mountGuest(token) {
 
   const renderBanner = (m) => {
     const left = Math.max(0, (m.ai_quota || 0) - (m.ai_used || 0));
-    banner.innerHTML = `<p class="muted">Shared cellar · ${left} request${left === 1 ? '' : 's'} left</p>`;
+    banner.innerHTML = `<p class="muted">Shared cabinet · ${left} request${left === 1 ? '' : 's'} left</p>`;
   };
   renderBanner(meta);
 
@@ -501,7 +501,7 @@ async function mountGuest(token) {
     return;
   }
   if (!bottles.length) {
-    grid.innerHTML = '<p class="muted">This cellar is empty.</p>';
+    grid.innerHTML = '<p class="muted">This cabinet is empty.</p>';
     return;
   }
 
@@ -522,10 +522,10 @@ async function mountGuest(token) {
   if (tonightPlan) {
     const tonightTab  = $('.guest-tab[data-tab="tonight"]', tabs);
     const tonightPane = $('.guest-pane[data-pane="tonight"]');
-    const cellarTab   = $('.guest-tab[data-tab="cellar"]', tabs);
+    const cabinetTab  = $('.guest-tab[data-tab="cabinet"]', tabs);
     if (tonightTab)  tonightTab.hidden = false;
     if (tonightPane) tonightPane.hidden = false;
-    if (cellarTab)   cellarTab.classList.remove('active');
+    if (cabinetTab)  cabinetTab.classList.remove('active');
     if (tonightTab)  tonightTab.classList.add('active');
     // Hide non-Tonight panes by default until the user clicks another tab.
     $$('.guest-pane').forEach((p) => { p.hidden = p.dataset.pane !== 'tonight'; });
@@ -705,7 +705,7 @@ async function renderGuestRecommendations(resultEl, response, bottleById, opts =
 // the button collapses to "Sent ✓" so the same result can't be double-
 // posted from the same render. Guest's display name persists in
 // localStorage so subsequent sends auto-fill.
-const GUEST_NAME_KEY = 'cellar27.guestName';
+const GUEST_NAME_KEY = 'cabinet.guestName';
 function getGuestName() {
   try { return localStorage.getItem(GUEST_NAME_KEY) || ''; }
   catch { return ''; }
@@ -991,7 +991,7 @@ function guestBottleRowHTML(b) {
     </article>`;
 }
 
-// ── Cellar grid (with search / filter / sort) ─────────────────────
+// ── Cabinet grid (with search / filter / sort) ────────────────────
 const STYLE_GROUPS = {
   red:       ['light_red', 'medium_red', 'full_red'],
   white:     ['light_white', 'full_white'],
@@ -1000,27 +1000,27 @@ const STYLE_GROUPS = {
   sweet:     ['dessert', 'fortified'],
 };
 
-const CELLAR_VIEW_KEY = 'cellar27.cellarView';
-const getCellarView = () => localStorage.getItem(CELLAR_VIEW_KEY) === 'card' ? 'card' : 'list';
-const setCellarView = (v) => { try { localStorage.setItem(CELLAR_VIEW_KEY, v); } catch { /* private mode */ } };
+const CABINET_VIEW_KEY = 'cabinet.cabinetView';
+const getCabinetView = () => localStorage.getItem(CABINET_VIEW_KEY) === 'card' ? 'card' : 'list';
+const setCabinetView = (v) => { try { localStorage.setItem(CABINET_VIEW_KEY, v); } catch { /* private mode */ } };
 
-async function mountCellar() {
-  const grid = $('#cellar-grid');
+async function mountCabinet() {
+  const grid = $('#cabinet-grid');
   if (!grid) return;
   grid.innerHTML = '<p class="muted">Loading…</p>';
   let bottles;
   try { bottles = await listBottles(); }
   catch (e) { grid.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`; return; }
   if (!bottles.length) {
-    grid.innerHTML = '<p class="muted">Empty cellar. <a href="#/scan">Scan a bottle →</a> or <a href="#/add">add manually</a>.</p>';
+    grid.innerHTML = '<p class="muted">Empty cabinet. <a href="#/scan">Scan a bottle →</a> or <a href="#/add">add manually</a>.</p>';
     return;
   }
 
   // Filter / sort / search / view state
   let activeFilter = 'all';
-  let sortMode = $('#cellar-sort')?.value || 'recent';
+  let sortMode = $('#cabinet-sort')?.value || 'recent';
   let searchTerm = '';
-  let viewMode = getCellarView();
+  let viewMode = getCabinetView();
 
   const repaint = () => {
     let view = bottles.slice();
@@ -1048,7 +1048,7 @@ async function mountCellar() {
     }[sortMode] || (() => 0);
     view.sort(cmp);
 
-    const count = $('#cellar-count');
+    const count = $('#cabinet-count');
     if (count) {
       count.hidden = view.length === bottles.length && !searchTerm && activeFilter === 'all';
       count.textContent = `${view.length} of ${bottles.length} bottles`;
@@ -1061,7 +1061,7 @@ async function mountCellar() {
     const builder = viewMode === 'list' ? bottleListRowHTML : bottleCardHTML;
     grid.innerHTML = view.map(builder).join('');
     grid.classList.toggle('grid', viewMode === 'card');
-    grid.classList.toggle('cellar-list', viewMode === 'list');
+    grid.classList.toggle('cabinet-list', viewMode === 'list');
     $$('[data-bottle-id]', grid).forEach((node) => {
       node.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
@@ -1074,13 +1074,13 @@ async function mountCellar() {
   };
 
   // Wire toolbar
-  const search = $('#cellar-search');
+  const search = $('#cabinet-search');
   if (search) search.addEventListener('input', (e) => { searchTerm = e.target.value.trim(); repaint(); });
-  const sort = $('#cellar-sort');
+  const sort = $('#cabinet-sort');
   if (sort) sort.addEventListener('change', (e) => { sortMode = e.target.value; repaint(); });
-  $$('#cellar-filters .chip').forEach((chip) => {
+  $$('#cabinet-filters .chip').forEach((chip) => {
     chip.addEventListener('click', () => {
-      $$('#cellar-filters .chip').forEach((c) => c.classList.remove('active'));
+      $$('#cabinet-filters .chip').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
       activeFilter = chip.dataset.styleFilter;
       repaint();
@@ -1088,16 +1088,16 @@ async function mountCellar() {
   });
   // View toggle: persist + repaint.
   const refreshToggleActive = () => {
-    $$('#cellar-view-toggle .view-toggle-btn').forEach((b) =>
+    $$('#cabinet-view-toggle .view-toggle-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === viewMode));
   };
   refreshToggleActive();
-  $$('#cellar-view-toggle .view-toggle-btn').forEach((btn) => {
+  $$('#cabinet-view-toggle .view-toggle-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const next = btn.dataset.view;
       if (next === viewMode) return;
       viewMode = next;
-      setCellarView(next);
+      setCabinetView(next);
       refreshToggleActive();
       repaint();
     });
@@ -1250,7 +1250,7 @@ async function autoEnrich(bottleId) {
       enrichFailures.set(bottleId, 'No details returned by sommelier.');
     }
   } catch (err) {
-    console.warn('[cellar27] autoEnrich failed:', err);
+    console.warn('[cabinet] autoEnrich failed:', err);
     enrichFailures.set(bottleId, err?.message || 'Sommelier request failed.');
     if (location.hash === `#/bottle/${bottleId}`) {
       showToast(`Couldn't fetch sommelier notes — tap Retry on the bottle.`);
@@ -1515,8 +1515,8 @@ function speakBtnHTML() {
 }
 
 // Voice + rate persistence + cache.
-const VOICE_KEY = 'cellar27.voiceURI';
-const RATE_KEY  = 'cellar27.voiceRate';
+const VOICE_KEY = 'cabinet.voiceURI';
+const RATE_KEY  = 'cabinet.voiceRate';
 let _voices = [];
 function loadVoices() { _voices = window.speechSynthesis?.getVoices() || []; }
 loadVoices();
@@ -1649,7 +1649,7 @@ function mountVoicePicker() {
   });
   $('#voice-test')?.addEventListener('click', () => {
     const fakeBtn = $('#voice-test'); // its .speaking class is harmless here
-    toggleSpeak('This is the cellar27 sommelier voice.', fakeBtn);
+    toggleSpeak('This is the Cabinet Master of Spirits voice.', fakeBtn);
   });
   // Click-outside dismiss.
   document.addEventListener('click', (e) => {
@@ -1733,7 +1733,7 @@ function mountFlight() {
         const { response } = await requestFlightExtras({
           themeHint: fd.get('theme_hint')?.trim() || null,
         });
-        // No structured cellar picks — render narrative only.
+        // No structured cabinet picks — render narrative only.
         extrasResult.innerHTML = response.narrative
           ? narrativeBlockHTML(response.narrative, { heading: 'Suggestions', headingTag: 'h3' })
           : '<p class="muted">(no suggestions)</p>';
@@ -2201,7 +2201,7 @@ function wirePlannedDetail(root, plan) {
 }
 
 // ── Drink-now ─────────────────────────────────────────────────────
-async function mountDrinkNow() {
+async function mountPourTonight() {
   const dnForm = $('#drink-now-form');
   const dnResult = $('#drink-now-result');
   if (dnForm) {
@@ -2463,7 +2463,7 @@ function mountManage() {
       try {
         await pourBottle(bottleId);
         showToast('Poured. Undo?', { actionLabel: 'Undo', onAction: () => undoPour(bottleId).catch(() => {}) });
-        location.hash = '#/cellar';
+        location.hash = '#/cabinet';
       } catch (err) { alert(err.message); }
     }
   });
@@ -2557,7 +2557,7 @@ function renderAddReviewHTML(ext, details, imagePaths, narrative) {
       <label>Notes<textarea name="notes" rows="2"></textarea></label>
       <div class="row">
         <button type="submit">Save bottle</button>
-        <a href="#/cellar" class="btn ghost" style="display:inline-block; padding:0.5rem 1rem; border:1px solid var(--surface-2); border-radius:var(--radius);">Cancel</a>
+        <a href="#/cabinet" class="btn ghost" style="display:inline-block; padding:0.5rem 1rem; border:1px solid var(--surface-2); border-radius:var(--radius);">Cancel</a>
       </div>
     </form>
     ${details ? `<section style="margin-top:2rem"><h3>Enrichment</h3><div class="narrative">${renderDetailsHTML(details)}</div></section>` : ''}
@@ -2623,7 +2623,7 @@ async function renderPourResultHTML(response) {
             <p class="muted">${escapeHtml(b.varietal)}${b.vintage ? ` · ${b.vintage}` : ''} · ×${b.quantity}</p>
             <div class="actions">
               <button data-action="confirm-pour" data-bottle-id="${b.id}" ${b.quantity <= 0 ? 'disabled' : ''}>Pour this</button>
-              <a href="#/cellar" class="btn ghost" style="display:inline-block; padding:0.4rem 0.8rem; border:1px solid var(--surface-2); border-radius:var(--radius);">Cancel</a>
+              <a href="#/cabinet" class="btn ghost" style="display:inline-block; padding:0.4rem 0.8rem; border:1px solid var(--surface-2); border-radius:var(--radius);">Cancel</a>
             </div>
           </div>
         </article>
@@ -2648,9 +2648,9 @@ async function renderPourResultHTML(response) {
     }));
     return `<h2>Possible matches</h2><div class="grid">${cards.join('')}</div>`;
   }
-  return `<h2>No match in your cellar</h2>
+  return `<h2>No match in your cabinet</h2>
     ${narrativeBlockHTML(response.narrative)}
-    <p><a href="#/manage">Scan again</a> or <a href="#/cellar">back to cellar</a>.</p>`;
+    <p><a href="#/manage">Scan again</a> or <a href="#/cabinet">back to cabinet</a>.</p>`;
 }
 
 // ── Bottle detail view ────────────────────────────────────────────
@@ -2747,7 +2747,7 @@ function wireBottleDetail(root, bottle) {
     }
     if (action === 'delete') {
       if (!confirm('Delete this bottle?')) return;
-      try { await deleteBottle(bottle.id); location.hash = '#/cellar'; }
+      try { await deleteBottle(bottle.id); location.hash = '#/cabinet'; }
       catch (err) { alert(err.message); }
       return;
     }
@@ -2882,7 +2882,7 @@ function escapeAttr(s) { return escapeHtml(s); }
   // Expose version in the topbar so we can eyeball whether the SW has
   // swapped to a new build yet.
   const versionEl = document.getElementById('app-version');
-  if (versionEl && self.CELLAR_VERSION) versionEl.textContent = `v${self.CELLAR_VERSION}`;
+  if (versionEl && self.CABINET_VERSION) versionEl.textContent = `v${self.CABINET_VERSION}`;
 }
 mountVoicePicker();
 window.addEventListener('hashchange', () => render());
@@ -2947,7 +2947,7 @@ if ('serviceWorker' in navigator) {
       });
       setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
     } catch (e) {
-      console.warn('[cellar27] SW register failed:', e);
+      console.warn('[cabinet] SW register failed:', e);
     }
   });
 }

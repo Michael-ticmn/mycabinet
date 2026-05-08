@@ -1,4 +1,4 @@
-// Service worker for cellar27 PWA.
+// Service worker for Cabinet PWA.
 //
 // Strategy:
 // - Version is the single source of truth: see version.js.
@@ -8,19 +8,19 @@
 // - Cross-origin (Supabase REST/Realtime, jsDelivr CDN) → network-only.
 
 importScripts('./version.js');
-const CACHE_VERSION = `cellar27-${self.CELLAR_VERSION}`;
+const CACHE_VERSION = `cabinet-${self.CABINET_VERSION}`;
 const SHELL = [
   './',
   './index.html',
   './version.js',
   './css/styles.css',
   './js/dist/app.bundle.js',
-  './views/cellar.html',
+  './views/cabinet.html',
   './views/add.html',
   './views/manage.html',
   './views/pairing.html',
   './views/flight.html',
-  './views/drink-now.html',
+  './views/pour-tonight.html',
   './views/share.html',
   './views/guest.html',
   './vendor/qrcode.min.js',
@@ -54,7 +54,7 @@ self.addEventListener('activate', (event) => {
     await self.clients.claim();
     // Tell every controlled page that a new version is now live.
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
-    for (const c of clients) c.postMessage({ type: 'sw-activated', version: self.CELLAR_VERSION });
+    for (const c of clients) c.postMessage({ type: 'sw-activated', version: self.CABINET_VERSION });
   })());
 });
 

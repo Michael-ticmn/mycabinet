@@ -1,13 +1,13 @@
 {
-  "name": "cellar27",
-  "short_name": "cellar27",
-  "description": "Personal wine cellar — catalog, pairings, tasting flights, drink-by tracking.",
+  "name": "Cabinet",
+  "short_name": "Cabinet",
+  "description": "Personal hard-spirits cabinet — catalog, pairings, tasting flights, peak-window tracking.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#1a0f0f",
-  "background_color": "#1a0f0f",
+  "theme_color": "#15110a",
+  "background_color": "#15110a",
   "lang": "en",
   "icons": [
     {

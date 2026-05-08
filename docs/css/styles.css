@@ -1,13 +1,13 @@
-/* cellar27 — palette per BUILD_SPEC §1.3 (proposed; awaiting Chat sign-off) */
+/* Cabinet — amber/oak palette (whiskey-inspired). */
 :root {
-  --bg:        #1a0f0f;
-  --surface:   #2d1818;
-  --surface-2: #3a2020;
-  --accent:    #8b1a1a;
-  --accent-2:  #a83838;
-  --highlight: #d4a574;
-  --text:      #f5e6d3;
-  --muted:     #b39d83;
+  --bg:        #15110a;
+  --surface:   #1f1810;
+  --surface-2: #2a2014;
+  --accent:    #b8741a;
+  --accent-2:  #d6953a;
+  --highlight: #e8c184;
+  --text:      #f3e6cc;
+  --muted:     #b39d7a;
   --error:     #e87474;
   --radius:    10px;
   --maxw:      1100px;
@@ -139,8 +139,8 @@ input:focus, select:focus, textarea:focus {
 }
 .auth-card h1 { font-size: 2rem; }
 
-/* Cellar grid (only when #cellar-grid has the .grid class — list mode
-   uses .cellar-list instead). */
+/* Cabinet grid (only when #cabinet-grid has the .grid class — list mode
+   uses .cabinet-list instead). */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -197,19 +197,19 @@ input:focus, select:focus, textarea:focus {
 }
 #toast button { padding: 0.25rem 0.65rem; font-size: 0.85rem; }
 
-/* Cellar toolbar: search + filter chips + sort */
-.cellar-toolbar {
+/* Cabinet toolbar: search + filter chips + sort */
+.cabinet-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
   align-items: center;
 }
-.cellar-toolbar #cellar-search {
+.cabinet-toolbar #cabinet-search {
   flex: 1 1 200px;
   min-width: 0;
 }
-.cellar-toolbar #cellar-sort {
+.cabinet-toolbar #cabinet-sort {
   flex: 0 0 auto;
 }
 .filter-chips {
@@ -239,7 +239,7 @@ input:focus, select:focus, textarea:focus {
 @media (min-width: 641px) {
   .filter-chips { order: 2; flex: 0 1 auto; }
 }
-#cellar-count { font-size: 0.85rem; margin: 0 0 0.75rem; }
+#cabinet-count { font-size: 0.85rem; margin: 0 0 0.75rem; }
 
 /* Lightbox: tap a label photo → fullscreen */
 .lightbox {
@@ -381,7 +381,7 @@ input:focus, select:focus, textarea:focus {
   h2 { font-size: 1.3rem; }
 
   /* Two cards per row on phones; smaller photo height */
-  .grid, #cellar-grid {
+  .grid, #cabinet-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 0.6rem;
   }
@@ -513,8 +513,8 @@ input:focus, select:focus, textarea:focus {
 #update-banner button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
 #update-banner-dismiss { padding: 0.2rem 0.5rem; line-height: 1; }
 
-/* ── Cellar list view (compact, default) ───────────────────────── */
-.cellar-list {
+/* ── Cabinet list view (compact, default) ──────────────────────── */
+.cabinet-list {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -572,7 +572,7 @@ input:focus, select:focus, textarea:focus {
 .bottle-row[data-style="dessert"]      { border-left-color: #d09858; }
 .bottle-row[data-style="fortified"]    { border-left-color: #8a3818; }
 
-/* ── List/Card view toggle in cellar toolbar ───────────────────── */
+/* ── List/Card view toggle in cabinet toolbar ──────────────────── */
 .view-toggle {
   display: inline-flex;
   border: 1px solid var(--surface-2);
