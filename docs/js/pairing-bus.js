@@ -10,32 +10,39 @@ function snapshotForBridge(bottles) {
   return bottles.map((b) => ({
     id: b.id,
     producer: b.producer,
-    wine_name: b.wine_name,
-    varietal: b.varietal,
-    blend_components: b.blend_components,
-    vintage: b.vintage,
+    expression_name: b.expression_name,
+    category: b.category,
+    sub_type: b.sub_type,
+    spirit_type: b.spirit_type,
+    age_statement: b.age_statement,
+    release_year: b.release_year,
     region: b.region,
     country: b.country,
-    style: b.style,
+    mash_bill: b.mash_bill,
+    proof: b.proof,
+    cask_type: b.cask_type,
+    cask_strength: b.cask_strength,
+    single_barrel: b.single_barrel,
+    finish: b.finish,
     sweetness: b.sweetness,
-    body: b.body,
+    intensity: b.intensity,
     quantity: b.quantity,
-    drink_window_start: b.drink_window_start,
-    drink_window_end: b.drink_window_end,
+    peak_window_start: b.peak_window_start,
+    peak_window_end: b.peak_window_end,
   }));
 }
 
-// Most request types want the full cellar snapshot; flight_plan operates
+// Most request types want the full cabinet snapshot; flight_plan operates
 // only on bottles already chosen, so we let callers pass an empty snapshot
-// to avoid hauling the whole cellar through the watcher prompt.
-export async function createRequest({ requestType, context, includeCellar = true }) {
+// to avoid hauling the whole cabinet through the watcher prompt.
+export async function createRequest({ requestType, context, includeCabinet = true }) {
   const { data: userData } = await sb.auth.getUser();
   if (!userData?.user) throw new Error('Not signed in');
 
   let snapshot = [];
-  if (includeCellar) {
+  if (includeCabinet) {
     const bottles = await listBottles();
-    if (!bottles.length) throw new Error('Cellar is empty — add bottles before requesting suggestions.');
+    if (!bottles.length) throw new Error('Cabinet is empty — add bottles before requesting suggestions.');
     snapshot = snapshotForBridge(bottles);
   }
 
@@ -43,7 +50,7 @@ export async function createRequest({ requestType, context, includeCellar = true
     user_id: userData.user.id,
     request_type: requestType,
     context,
-    cellar_snapshot: snapshot,
+    cabinet_snapshot: snapshot,
   }).select().single();
   if (error) throw error;
   return data;

@@ -1,20 +1,33 @@
 <section>
   <h1>Pairing</h1>
-  <p class="muted">Describe the dish and the table; your sommelier picks 1–2 bottles from your cellar.</p>
+  <p class="muted">Pair a bottle from your cabinet with food, a cigar, or an occasion. The Master of Spirits picks 1–2 bottles to match.</p>
+
   <form id="pairing-form">
-    <label>Dish<textarea name="dish" rows="2" placeholder="e.g. seared duck breast with cherry reduction" required></textarea></label>
+    <fieldset class="pairing-kind" role="radiogroup" aria-label="Pairing kind" style="border:1px solid var(--surface-2); padding:0.5rem 0.75rem; border-radius:var(--radius); margin-bottom:0.75rem;">
+      <legend class="muted">What are we pairing with?</legend>
+      <label style="margin-right:1rem"><input type="radio" name="kind" value="food" checked /> Food</label>
+      <label style="margin-right:1rem"><input type="radio" name="kind" value="cigar" /> Cigar</label>
+      <label><input type="radio" name="kind" value="occasion" /> Occasion</label>
+    </fieldset>
+
+    <label>Describe it
+      <textarea name="dish" rows="2" placeholder="e.g. seared duck breast with cherry reduction · or · Padrón 1964 Maduro · or · winter porch fire" required></textarea>
+    </label>
+    <input type="hidden" name="cigar" />
     <div class="row">
       <label style="flex:1">Guests<input name="guests" type="number" min="1" value="2" /></label>
-      <label style="flex:1">Occasion
+      <label style="flex:1">Occasion (context, optional)
         <select name="occasion">
+          <option value="">—</option>
           <option value="weeknight">weeknight</option>
           <option value="dinner_party">dinner party</option>
           <option value="celebration">celebration</option>
           <option value="casual">casual</option>
+          <option value="nightcap">nightcap</option>
         </select>
       </label>
     </div>
-    <label>Constraints (optional)<input name="constraints" placeholder="e.g. avoid heavy reds, save the Burgundy" /></label>
+    <label>Constraints (optional)<input name="constraints" placeholder="e.g. avoid peated scotch, save the Pappy" /></label>
     <button type="submit">Get pairing</button>
   </form>
   <div id="pairing-result"></div>

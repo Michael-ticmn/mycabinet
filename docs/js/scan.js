@@ -56,7 +56,7 @@ export async function uploadCapture(blob, { scanId, label }) {
 }
 
 // Insert a scan_request row. Returns the inserted row.
-export async function submitScanRequest({ intent, imagePaths, context = null, cellarSnapshot = null }) {
+export async function submitScanRequest({ intent, imagePaths, context = null, cabinetSnapshot = null }) {
   const { data: userData } = await sb.auth.getUser();
   if (!userData?.user) throw new Error('Not signed in');
   const row = {
@@ -64,7 +64,7 @@ export async function submitScanRequest({ intent, imagePaths, context = null, ce
     intent,
     image_paths: imagePaths,
     context,
-    cellar_snapshot: cellarSnapshot,
+    cabinet_snapshot: cabinetSnapshot,
   };
   const { data, error } = await sb.from('scan_requests').insert(row).select().single();
   if (error) throw error;

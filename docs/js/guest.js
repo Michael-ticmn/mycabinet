@@ -1,17 +1,17 @@
-// Guest-side helpers: read a shared cellar via a share-link token. No auth
+// Guest-side helpers: read a shared cabinet via a share-link token. No auth
 // session required — calls SECURITY DEFINER RPCs granted to the anon role.
-// See supabase/migrations/0006_share_links.sql + 0007_share_links_ai.sql.
+// See supabase/migrations/0001_init.sql (cabinet_share_* RPCs).
 
 import { sb } from './supabase-client.js';
 
 export async function resolveShare(token) {
-  const { data, error } = await sb.rpc('cellar27_share_resolve', { p_token: token });
+  const { data, error } = await sb.rpc('cabinet_share_resolve', { p_token: token });
   if (error) throw error;
   return Array.isArray(data) && data.length ? data[0] : null;
 }
 
 export async function listBottlesForShare(token) {
-  const { data, error } = await sb.rpc('cellar27_share_list_bottles', { p_token: token });
+  const { data, error } = await sb.rpc('cabinet_share_list_bottles', { p_token: token });
   if (error) throw error;
   return data || [];
 }
@@ -20,7 +20,7 @@ export async function listBottlesForShare(token) {
 // link, with sanitized bottle metadata for each pick — or null if the
 // owner hasn't attached a plan yet. RPC is SECURITY DEFINER (anon-safe).
 export async function getSharedPlannedFlight(token) {
-  const { data, error } = await sb.rpc('cellar27_share_get_planned_flight', { p_token: token });
+  const { data, error } = await sb.rpc('cabinet_share_get_planned_flight', { p_token: token });
   if (error) throw new Error(prettyShareError(error));
   return data || null;
 }
@@ -29,7 +29,7 @@ export async function getSharedPlannedFlight(token) {
 // (kind='ai_result') or a per-pour note on Tonight (kind='pour_note').
 // guestName is optional; the SECURITY DEFINER RPC nullifies blank/whitespace.
 export async function sendGuestMessage(token, { kind, payload, guestName }) {
-  const { data, error } = await sb.rpc('cellar27_share_create_message', {
+  const { data, error } = await sb.rpc('cabinet_share_create_message', {
     p_token:      token,
     p_guest_name: guestName || null,
     p_kind:       kind,
@@ -43,7 +43,7 @@ export async function sendGuestMessage(token, { kind, payload, guestName }) {
 // SECURITY DEFINER reader instead. Mirrors the timeout shape of waitForResponse
 // in pairings.js (5 min cap).
 async function createAndAwait(token, requestType, context) {
-  const { data: requestId, error } = await sb.rpc('cellar27_share_create_pairing_request', {
+  const { data: requestId, error } = await sb.rpc('cabinet_share_create_pairing_request', {
     p_token: token,
     p_request_type: requestType,
     p_context: context,
@@ -53,12 +53,11 @@ async function createAndAwait(token, requestType, context) {
 
   // Exponential backoff: most enrichments come back in 5–15s, so polling
   // every 2s for the full 5 min is wasteful (~150 RPC calls). Start tight
-  // (500ms), double each round, cap at 5s. Worst-case call count drops
-  // from ~150 to ~70 while keeping the same first-result latency.
+  // (500ms), double each round, cap at 5s.
   const deadline = Date.now() + 5 * 60_000;
   let delay = 500;
   while (Date.now() < deadline) {
-    const { data, error: pollErr } = await sb.rpc('cellar27_share_get_response', {
+    const { data, error: pollErr } = await sb.rpc('cabinet_share_get_response', {
       p_token: token,
       p_request_id: requestId,
     });
@@ -84,8 +83,16 @@ function prettyShareError(err) {
   return m;
 }
 
-export async function requestPairingForShare(token, { dish, guests, occasion, constraints }) {
-  return createAndAwait(token, 'pairing', { dish, guests, occasion, constraints });
+export async function requestFoodPairingForShare(token, { dish, guests, occasion, constraints }) {
+  return createAndAwait(token, 'pair_food', { dish, guests, occasion, constraints });
+}
+
+export async function requestCigarPairingForShare(token, { cigar, guests, occasion, constraints }) {
+  return createAndAwait(token, 'pair_cigar', { cigar, guests, occasion, constraints });
+}
+
+export async function requestOccasionPairingForShare(token, { occasion, guests, constraints }) {
+  return createAndAwait(token, 'pair_occasion', { occasion, guests, constraints });
 }
 
 export async function requestFlightForShare(token, { theme, guests, length, food, notes }) {
@@ -102,6 +109,6 @@ export async function requestFlightExtrasForShare(token, { themeHint }) {
   return createAndAwait(token, 'flight', { kind: 'extras', theme_hint: themeHint || null });
 }
 
-export async function requestDrinkNowForShare(token, { notes }) {
-  return createAndAwait(token, 'drink_now', { notes: notes || null });
+export async function requestPourTonightForShare(token, { notes }) {
+  return createAndAwait(token, 'pour_tonight', { notes: notes || null });
 }

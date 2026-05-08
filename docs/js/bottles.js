@@ -1,5 +1,5 @@
 import { sb } from './supabase-client.js';
-import { suggestDrinkWindow } from './varietal-windows.js';
+import { suggestPeakWindow } from './spirit-types.js';
 
 // All queries rely on RLS to scope by user_id; we still set user_id on insert.
 
@@ -18,31 +18,33 @@ export async function getBottle(id) {
   return data;
 }
 
-// Auto-fills drink_window_start/end from varietal+vintage if user didn't set them.
-// Sets drink_window_overridden=false in the auto case, true if user provided either.
+// Auto-fills peak_window_start/end from category+age_statement if user didn't
+// set them. Spirits don't typically age in bottle, so the window opens at
+// acquisition and stays open — see suggestPeakWindow() for the tier band.
+// Sets peak_window_overridden=false in the auto case, true if user provided either.
 export async function createBottle(input) {
   const { data: userData } = await sb.auth.getUser();
   if (!userData?.user) throw new Error('Not signed in');
 
-  const userOverrode = input.drink_window_start != null || input.drink_window_end != null;
-  let { drink_window_start, drink_window_end } = input;
+  const userOverrode = input.peak_window_start != null || input.peak_window_end != null;
+  let { peak_window_start, peak_window_end } = input;
 
-  if (!userOverrode && input.vintage) {
-    const { start, end } = suggestDrinkWindow({
-      varietal: input.varietal,
-      style: input.style,
-      vintage: input.vintage,
+  if (!userOverrode) {
+    const { start, end } = suggestPeakWindow({
+      category: input.category,
+      sub_type: input.sub_type,
+      age_statement: input.age_statement,
     });
-    drink_window_start = start;
-    drink_window_end = end;
+    peak_window_start = start;
+    peak_window_end = end;
   }
 
   const row = {
     ...input,
     user_id: userData.user.id,
-    drink_window_start,
-    drink_window_end,
-    drink_window_overridden: userOverrode,
+    peak_window_start,
+    peak_window_end,
+    peak_window_overridden: userOverrode,
   };
 
   const { data, error } = await sb.from('bottles').insert(row).select().single();
@@ -51,9 +53,9 @@ export async function createBottle(input) {
 }
 
 export async function updateBottle(id, patch) {
-  // If user touches drink window fields, flip the override flag.
-  const touchesWindow = 'drink_window_start' in patch || 'drink_window_end' in patch;
-  const finalPatch = touchesWindow ? { ...patch, drink_window_overridden: true } : patch;
+  // If user touches peak window fields, flip the override flag.
+  const touchesWindow = 'peak_window_start' in patch || 'peak_window_end' in patch;
+  const finalPatch = touchesWindow ? { ...patch, peak_window_overridden: true } : patch;
   const { data, error } = await sb.from('bottles').update(finalPatch).eq('id', id).select().single();
   if (error) throw error;
   return data;
@@ -64,24 +66,26 @@ export async function deleteBottle(id) {
   if (error) throw error;
 }
 
-// Find an existing bottle that's the SAME wine (so a scan-add can offer
+// Find an existing bottle that's the SAME expression (so a scan-add can offer
 // "increment quantity" instead of creating a duplicate row). Different
-// vintage is treated as a different bottle. Falls back to varietal-match
-// when wine_name is missing on either side.
-export async function findDuplicate({ producer, wine_name, vintage, varietal }) {
-  if (!producer || vintage == null) return null;
+// release_year or age_statement is treated as a different bottle. Falls back
+// to category-match when expression_name is missing on either side.
+export async function findDuplicate({ producer, expression_name, release_year, age_statement, category }) {
+  if (!producer) return null;
   const norm = (s) => (s || '').trim().toLowerCase();
   const np = norm(producer);
-  const nw = norm(wine_name);
-  const nv = norm(varietal);
+  const ne = norm(expression_name);
+  const nc = norm(category);
   const all = await listBottles();
   return all.find((b) => {
     if (norm(b.producer) !== np) return false;
-    if (b.vintage !== vintage) return false; // different year = different bottle
-    const bw = norm(b.wine_name);
-    if (nw && bw) return nw === bw;
-    if (!nw && !bw) return norm(b.varietal) === nv;
-    return false; // one has wine_name, other doesn't — treat as different
+    // Different age statement OR different release year = different bottle.
+    if ((b.age_statement ?? null) !== (age_statement ?? null)) return false;
+    if ((b.release_year  ?? null) !== (release_year  ?? null)) return false;
+    const be = norm(b.expression_name);
+    if (ne && be) return ne === be;
+    if (!ne && !be) return norm(b.category) === nc;
+    return false; // one has expression_name, other doesn't — treat as different
   }) || null;
 }
 

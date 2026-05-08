@@ -1,22 +1,23 @@
 <section>
-  <div class="cellar-toolbar">
-    <input type="search" id="cellar-search" placeholder="Search producer, wine, region…" autocomplete="off" />
-    <div class="filter-chips" id="cellar-filters" role="tablist" aria-label="Filter by style">
-      <button class="chip active" data-style-filter="all">All</button>
-      <button class="chip" data-style-filter="red">Red</button>
-      <button class="chip" data-style-filter="white">White</button>
-      <button class="chip" data-style-filter="rose">Rosé</button>
-      <button class="chip" data-style-filter="sparkling">Sparkling</button>
-      <button class="chip" data-style-filter="sweet">Sweet</button>
+  <div class="cabinet-toolbar">
+    <input type="search" id="cabinet-search" placeholder="Search producer, expression, region…" autocomplete="off" />
+    <div class="filter-chips" id="cabinet-filters" role="tablist" aria-label="Filter by category">
+      <button class="chip active" data-category-filter="all">All</button>
+      <button class="chip" data-category-filter="whiskey">Whiskey</button>
+      <button class="chip" data-category-filter="agave">Agave</button>
+      <button class="chip" data-category-filter="rum">Rum</button>
+      <button class="chip" data-category-filter="brandy">Brandy</button>
+      <button class="chip" data-category-filter="other">Other</button>
     </div>
-    <select id="cellar-sort" aria-label="Sort">
+    <select id="cabinet-sort" aria-label="Sort">
       <option value="recent">Recently added</option>
       <option value="producer">Producer A–Z</option>
-      <option value="vintage">Vintage (newest)</option>
-      <option value="vintage_oldest">Vintage (oldest)</option>
-      <option value="drink_end">Drink window end</option>
+      <option value="age">Age statement (oldest)</option>
+      <option value="age_youngest">Age statement (youngest)</option>
+      <option value="proof">Proof (highest)</option>
+      <option value="peak_end">Peak window end</option>
     </select>
-    <div class="view-toggle" id="cellar-view-toggle" role="group" aria-label="Layout">
+    <div class="view-toggle" id="cabinet-view-toggle" role="group" aria-label="Layout">
       <button type="button" class="view-toggle-btn" data-view="list" aria-label="List view" title="List view">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
           <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -35,6 +36,6 @@
       </button>
     </div>
   </div>
-  <p class="muted" id="cellar-count" hidden></p>
-  <div id="cellar-grid" class="grid"></div>
+  <p class="muted" id="cabinet-count" hidden></p>
+  <div id="cabinet-grid" class="grid"></div>
 </section>

@@ -1,14 +1,16 @@
 <section>
   <h1>Flight builder</h1>
-  <p class="muted">Tell your sommelier a theme; they'll order 3–5 bottles from your cellar into a teaching flight.</p>
+  <p class="muted">Tell the Master of Spirits a theme; they'll order 3–5 bottles from your cabinet into a teaching flight.</p>
   <form id="flight-form">
     <label>Theme
       <select name="theme">
         <option value="surprise_me" selected>Surprise me</option>
-        <option value="vertical">Vertical (same wine, different vintages)</option>
-        <option value="horizontal">Horizontal (same vintage, different producers)</option>
-        <option value="varietal_comparison">Varietal comparison</option>
+        <option value="vertical_age">Vertical (same expression, different ages)</option>
+        <option value="horizontal_producer">Horizontal (same category, different producers)</option>
+        <option value="mash_bill_comparison">Mash-bill comparison</option>
         <option value="regional_tour">Regional tour</option>
+        <option value="cask_finish">Cask-finish exploration</option>
+        <option value="proof_progression">Proof progression</option>
       </select>
     </label>
     <div class="row">
@@ -20,11 +22,11 @@
         </select>
       </label>
     </div>
-    <label>Food we'll be eating (optional)
-      <input name="food" placeholder="e.g. cheese plate, grilled lamb, charcuterie" />
+    <label>Food / cigar / occasion (optional)
+      <input name="food" placeholder="e.g. dark chocolate, Cohiba, fireside" />
     </label>
-    <label>Other notes for the sommelier (optional)
-      <textarea name="notes" rows="2" placeholder="e.g. mostly newcomers to wine, focus on bottles I've owned over a year, avoid the heaviest reds"></textarea>
+    <label>Other notes for the Master of Spirits (optional)
+      <textarea name="notes" rows="2" placeholder="e.g. mostly newcomers to spirits, focus on bottles I've owned over a year, avoid anything cask strength"></textarea>
     </label>
     <button type="submit">Build flight</button>
   </form>
@@ -32,11 +34,11 @@
 
   <hr style="border-color: var(--surface-2); margin: 2rem 0;" />
 
-  <h2>Round out the cellar</h2>
-  <p class="muted">Suggest 1–2 wines you don't have that would meaningfully expand what flights you could build.</p>
+  <h2>Round out the cabinet</h2>
+  <p class="muted">Suggest 1–2 bottles you don't have that would meaningfully expand what flights you could build.</p>
   <form id="flight-extras-form">
     <label>Theme or constraint (optional)
-      <input name="theme_hint" placeholder="e.g. fill out my Burgundy collection, more Old World whites" />
+      <input name="theme_hint" placeholder="e.g. fill out my Islay collection, more aged tequila" />
     </label>
     <button type="submit">Suggest additions</button>
   </form>

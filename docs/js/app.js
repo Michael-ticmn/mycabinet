@@ -1,7 +1,10 @@
 import { getSession, signIn, signUp, onAuthChange } from './auth.js';
 import { listBottles, createBottle, deleteBottle, pourBottle, undoPour, getBottle, updateBottle, findDuplicate } from './bottles.js';
-import { VARIETAL_NAMES, suggestDrinkWindow } from './varietal-windows.js';
-import { requestPairing, requestFlight, requestFlightExtras, requestDrinkNow } from './pairings.js';
+import { CATEGORY_KEYS, SPIRIT_CATEGORIES, suggestPeakWindow } from './spirit-types.js';
+import {
+  requestFoodPairing, requestCigarPairing, requestOccasionPairing,
+  requestFlight, requestFlightExtras, requestPourTonight,
+} from './pairings.js';
 import {
   listPlannedFlights, getPlannedFlight, createPlannedFlight,
   updatePlannedFlight, deletePlannedFlight, requestFlightPlanEnrichment,
@@ -15,18 +18,15 @@ import {
 } from './scan.js';
 import {
   resolveShare, listBottlesForShare,
-  requestPairingForShare, requestFlightForShare,
-  requestFlightExtrasForShare, requestDrinkNowForShare,
+  requestFoodPairingForShare, requestCigarPairingForShare, requestOccasionPairingForShare,
+  requestFlightForShare, requestFlightExtrasForShare, requestPourTonightForShare,
   getSharedPlannedFlight, sendGuestMessage,
 } from './guest.js';
 import { getActiveShareLink, createShareLink, revokeShareLink, shareUrlFor, listGuestMessages, countGuestMessagesSince, listAllOwnerShareLinks, listAllOwnerGuestMessages } from './share.js';
 
-const STYLES = [
-  'light_red','medium_red','full_red',
-  'light_white','full_white',
-  'rose','sparkling','dessert','fortified',
-];
-const SWEETNESS_OPTS = ['bone_dry','dry','off_dry','sweet'];
+const CATEGORIES = CATEGORY_KEYS;
+const CATEGORY_LABELS = SPIRIT_CATEGORIES.reduce((acc, c) => { acc[c.key] = c.label; return acc; }, {});
+const SWEETNESS_OPTS = ['dry','off_dry','sweet'];
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -220,7 +220,7 @@ async function renderGuestActivity(activeLink) {
 
   section.hidden = false;
   if (!messages.length) {
-    list.innerHTML = '<p class="muted">No guest activity yet. When guests use the share link to ask the sommelier or leave a note on Tonight, it shows up here. Past tastings stay visible after the link expires.</p>';
+    list.innerHTML = '<p class="muted">No guest activity yet. When guests use the share link to ask the Master of Spirits or leave a note on Tonight, it shows up here. Past tastings stay visible after the link expires.</p>';
     return;
   }
 
@@ -559,16 +559,16 @@ async function mountGuest(token) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const out = $('#guest-pair-result');
-    await withBusySubmit(e.currentTarget, out, 'Asking the sommelier… (up to a couple of minutes)', async () => {
+    await withBusySubmit(e.currentTarget, out, 'Asking the Master of Spirits… (up to a couple of minutes)', async () => {
       const ctx = {
         dish: fd.get('dish').trim(),
         guests: numOrNull(fd.get('guests')) ?? 2,
         occasion: fd.get('occasion'),
         constraints: fd.get('constraints')?.trim() || null,
       };
-      const { response } = await requestPairingForShare(token, ctx);
+      const { response } = await requestFoodPairingForShare(token, ctx);
       await renderGuestRecommendations(out, response, bottleById, {
-        token, requestType: 'pairing', context: ctx,
+        token, requestType: 'pair_food', context: ctx,
       });
     });
     refreshQuota();
@@ -595,16 +595,16 @@ async function mountGuest(token) {
     refreshQuota();
   });
 
-  // Drink now / sommelier
-  $('#guest-drinknow-form')?.addEventListener('submit', async (e) => {
+  // Pour tonight / Master of Spirits
+  $('#guest-pourtonight-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const out = $('#guest-drinknow-result');
-    await withBusySubmit(e.currentTarget, out, 'Asking the sommelier…', async () => {
+    const out = $('#guest-pourtonight-result');
+    await withBusySubmit(e.currentTarget, out, 'Asking the Master of Spirits…', async () => {
       const ctx = { notes: fd.get('notes')?.trim() || null };
-      const { response } = await requestDrinkNowForShare(token, ctx);
+      const { response } = await requestPourTonightForShare(token, ctx);
       await renderGuestRecommendations(out, response, bottleById, {
-        token, requestType: 'drink_now', context: ctx,
+        token, requestType: 'pour_tonight', context: ctx,
       });
     });
     refreshQuota();
@@ -617,19 +617,20 @@ async function mountGuest(token) {
   const repaint = () => {
     let view = bottles.slice();
     if (activeFilter !== 'all') {
-      const allowed = new Set(STYLE_GROUPS[activeFilter] || []);
-      view = view.filter((b) => allowed.has(b.style));
+      const allowed = new Set(CATEGORY_GROUPS[activeFilter] || []);
+      view = view.filter((b) => allowed.has(b.category));
     }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
-      view = view.filter((b) => [b.producer, b.wine_name, b.varietal, b.region, b.country]
+      view = view.filter((b) => [b.producer, b.expression_name, b.spirit_type, b.region, b.country]
         .some((s) => (s || '').toLowerCase().includes(q)));
     }
     const cmp = {
       producer:       (a, b) => (a.producer || '').localeCompare(b.producer || ''),
-      vintage:        (a, b) => (b.vintage || 0) - (a.vintage || 0),
-      vintage_oldest: (a, b) => (a.vintage || 9999) - (b.vintage || 9999),
-      drink_end:      (a, b) => (a.drink_window_end || 9999) - (b.drink_window_end || 9999),
+      age:            (a, b) => (b.age_statement || 0) - (a.age_statement || 0),
+      age_youngest:   (a, b) => (a.age_statement || 9999) - (b.age_statement || 9999),
+      proof:          (a, b) => (b.proof || 0) - (a.proof || 0),
+      peak_end:       (a, b) => (a.peak_window_end || 9999) - (b.peak_window_end || 9999),
     }[sortMode] || (() => 0);
     view.sort(cmp);
 
@@ -649,7 +650,7 @@ async function mountGuest(token) {
     chip.addEventListener('click', () => {
       $$('#guest-filters .chip').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
-      activeFilter = chip.dataset.styleFilter;
+      activeFilter = chip.dataset.categoryFilter;
       repaint();
     });
   });
@@ -668,11 +669,11 @@ async function renderGuestRecommendations(resultEl, response, bottleById, opts =
         <p>${escapeHtml(r.reasoning || '')}</p>
       </div></article>`;
     }
-    return `<article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-style="${escapeAttr(bottle.style || '')}" tabindex="0">
+    return `<article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-category="${escapeAttr(bottle.category || '')}" tabindex="0">
       <div class="bottle-photo placeholder">${escapeHtml((bottle.producer || '?')[0])}</div>
       <div class="bottle-meta">
-        <h3>${escapeHtml(bottle.producer)}${bottle.wine_name ? ` <span class="muted">· ${escapeHtml(bottle.wine_name)}</span>` : ''}</h3>
-        <p class="muted">${escapeHtml(bottle.varietal)}${bottle.vintage ? ` · ${bottle.vintage}` : ''}</p>
+        <h3>${escapeHtml(bottle.producer)}${bottle.expression_name ? ` <span class="muted">· ${escapeHtml(bottle.expression_name)}</span>` : ''}</h3>
+        <p class="muted">${escapeHtml(bottle.spirit_type)}${bottle.age_statement ? ` · ${bottle.age_statement}` : ''}</p>
         <p><span class="qty">${escapeHtml(r.confidence || 'medium')}</span> · ${escapeHtml(r.reasoning || '')}</p>
       </div>
     </article>`;
@@ -701,7 +702,7 @@ async function renderGuestRecommendations(resultEl, response, bottleById, opts =
 }
 
 // Inline "Send to host" affordance + first-time name prompt. Renders
-// inside any guest result panel (Pair / Flight / Sommelier). Once sent,
+// inside any guest result panel (Pair / Flight / Master of Spirits). Once sent,
 // the button collapses to "Sent ✓" so the same result can't be double-
 // posted from the same render. Guest's display name persists in
 // localStorage so subsequent sends auto-fill.
@@ -839,8 +840,8 @@ function renderTonightPane(root, plan, token) {
       const bottle = bottleById.get(pick.bottle_id);
       const w      = walkById.get(pick.bottle_id);
       const num    = i + 1;
-      const sub    = bottle ? [bottle.varietal, bottle.vintage, bottle.region, bottle.country].filter(Boolean).map(escapeHtml).join(' · ') : '';
-      const title  = bottle ? `${escapeHtml(bottle.producer)}${bottle.wine_name ? ` <span class="muted">· ${escapeHtml(bottle.wine_name)}</span>` : ''}` : `<span class="muted">Unknown bottle</span>`;
+      const sub    = bottle ? [bottle.spirit_type, bottle.age_statement, bottle.region, bottle.country].filter(Boolean).map(escapeHtml).join(' · ') : '';
+      const title  = bottle ? `${escapeHtml(bottle.producer)}${bottle.expression_name ? ` <span class="muted">· ${escapeHtml(bottle.expression_name)}</span>` : ''}` : `<span class="muted">Unknown bottle</span>`;
       const lookFor = w?.what_to_look_for
         ? `<p class="pour-look">${escapeHtml(w.what_to_look_for)}</p>`
         : (pick.reasoning ? `<p class="pour-look muted">${escapeHtml(pick.reasoning)}</p>` : '');
@@ -851,7 +852,7 @@ function renderTonightPane(root, plan, token) {
         ? `<p class="pour-transition">${escapeHtml(w.transition)}</p>`
         : '';
       const noteWidget = token ? pourNoteWidgetHTML() : '';
-      return `<article class="pour-block" data-style="${escapeAttr(bottle?.style || '')}" data-pour-bottle-id="${escapeAttr(pick.bottle_id)}">
+      return `<article class="pour-block" data-category="${escapeAttr(bottle?.category || '')}" data-pour-bottle-id="${escapeAttr(pick.bottle_id)}">
         <div class="pour-num">Pour ${num}</div>
         <h3>${title}</h3>
         ${sub ? `<p class="muted">${sub}</p>` : ''}
@@ -942,10 +943,10 @@ function wirePourNoteWidgets(root, token, plannedFlightId) {
 function showGuestBottleDetail(b) {
   const modal = $('#guest-bottle-modal');
   if (!modal) return;
-  const sub = [b.varietal, b.vintage, b.region, b.country].filter(Boolean).map(escapeHtml).join(' · ');
-  const window = (b.drink_window_start && b.drink_window_end)
-    ? `${b.drink_window_start}–${b.drink_window_end}` : '—';
-  // The share RPC now returns `b.details` (sommelier enrichment jsonb —
+  const sub = [b.spirit_type, b.age_statement, b.region, b.country].filter(Boolean).map(escapeHtml).join(' · ');
+  const window = (b.peak_window_start && b.peak_window_end)
+    ? `${b.peak_window_start}–${b.peak_window_end}` : '—';
+  // The share RPC now returns `b.details` (Master of Spirits enrichment jsonb —
   // tasting notes, food pairings, producer/region/serving). Render it
   // through the same helper the owner detail page uses so guests see
   // the same depth of info.
@@ -956,12 +957,12 @@ function showGuestBottleDetail(b) {
       </section>`
     : '';
   $('#guest-bottle-detail').innerHTML = `
-    <h2>${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h2>
+    <h2>${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h2>
     <p class="muted">${sub}</p>
     <dl class="bottle-meta-grid">
-      <dt>Style</dt><dd>${escapeHtml(b.style || '—')}</dd>
+      <dt>Style</dt><dd>${escapeHtml(b.category || '—')}</dd>
       ${b.sweetness ? `<dt>Sweetness</dt><dd>${escapeHtml(b.sweetness)}</dd>` : ''}
-      ${b.body ? `<dt>Body</dt><dd>${b.body} / 5</dd>` : ''}
+      ${b.intensity ? `<dt>Body</dt><dd>${b.intensity} / 5</dd>` : ''}
       <dt>Quantity</dt><dd>×${b.quantity}</dd>
       <dt>Drink window</dt><dd>${window}</dd>
     </dl>
@@ -970,18 +971,18 @@ function showGuestBottleDetail(b) {
 }
 
 function guestBottleRowHTML(b) {
-  const window = (b.drink_window_start && b.drink_window_end)
-    ? `${b.drink_window_start}–${b.drink_window_end}`
+  const window = (b.peak_window_start && b.peak_window_end)
+    ? `${b.peak_window_start}–${b.peak_window_end}`
     : '';
   const subParts = [
-    escapeHtml(b.varietal),
-    b.vintage ? String(b.vintage) : '',
+    escapeHtml(b.spirit_type),
+    b.age_statement ? String(b.age_statement) : '',
     b.region ? escapeHtml(b.region) : '',
   ].filter(Boolean).join(' · ');
   return `
-    <article class="bottle-row" data-bottle-id="${escapeAttr(b.id)}" data-style="${escapeAttr(b.style || '')}" tabindex="0">
+    <article class="bottle-row" data-bottle-id="${escapeAttr(b.id)}" data-category="${escapeAttr(b.category || '')}" tabindex="0">
       <div class="bottle-row-main">
-        <h3 class="bottle-row-title">${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h3>
+        <h3 class="bottle-row-title">${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h3>
         <p class="bottle-row-sub muted">${subParts}</p>
       </div>
       <div class="bottle-row-aside">
@@ -992,12 +993,14 @@ function guestBottleRowHTML(b) {
 }
 
 // ── Cabinet grid (with search / filter / sort) ────────────────────
-const STYLE_GROUPS = {
-  red:       ['light_red', 'medium_red', 'full_red'],
-  white:     ['light_white', 'full_white'],
-  rose:      ['rose'],
-  sparkling: ['sparkling'],
-  sweet:     ['dessert', 'fortified'],
+// Filter chip groups for the cabinet (and guest) views. Each key maps to
+// a set of `category` enum values; chips are selected by data-category-filter.
+const CATEGORY_GROUPS = {
+  whiskey: ['bourbon', 'rye', 'american_whiskey_other', 'scotch', 'irish_whiskey', 'japanese_whisky', 'world_whisky'],
+  agave:   ['tequila', 'mezcal', 'agave_other'],
+  rum:     ['rum'],
+  brandy:  ['cognac', 'armagnac', 'brandy_other'],
+  other:   ['gin', 'vodka', 'liqueur', 'other'],
 };
 
 const CABINET_VIEW_KEY = 'cabinet.cabinetView';
@@ -1027,14 +1030,14 @@ async function mountCabinet() {
 
     // Filter by style group
     if (activeFilter !== 'all') {
-      const allowed = new Set(STYLE_GROUPS[activeFilter] || []);
-      view = view.filter((b) => allowed.has(b.style));
+      const allowed = new Set(CATEGORY_GROUPS[activeFilter] || []);
+      view = view.filter((b) => allowed.has(b.category));
     }
 
-    // Search across producer, wine_name, varietal, region, country
+    // Search across producer, expression_name, spirit_type, region, country
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
-      view = view.filter((b) => [b.producer, b.wine_name, b.varietal, b.region, b.country]
+      view = view.filter((b) => [b.producer, b.expression_name, b.spirit_type, b.region, b.country]
         .some((s) => (s || '').toLowerCase().includes(q)));
     }
 
@@ -1042,9 +1045,10 @@ async function mountCabinet() {
     const cmp = {
       recent:         (a, b) => (b.created_at || '').localeCompare(a.created_at || ''),
       producer:       (a, b) => (a.producer || '').localeCompare(b.producer || ''),
-      vintage:        (a, b) => (b.vintage || 0) - (a.vintage || 0),
-      vintage_oldest: (a, b) => (a.vintage || 9999) - (b.vintage || 9999),
-      drink_end:      (a, b) => (a.drink_window_end || 9999) - (b.drink_window_end || 9999),
+      age:            (a, b) => (b.age_statement || 0) - (a.age_statement || 0),
+      age_youngest:   (a, b) => (a.age_statement || 9999) - (b.age_statement || 9999),
+      proof:          (a, b) => (b.proof || 0) - (a.proof || 0),
+      peak_end:       (a, b) => (a.peak_window_end || 9999) - (b.peak_window_end || 9999),
     }[sortMode] || (() => 0);
     view.sort(cmp);
 
@@ -1082,7 +1086,7 @@ async function mountCabinet() {
     chip.addEventListener('click', () => {
       $$('#cabinet-filters .chip').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
-      activeFilter = chip.dataset.styleFilter;
+      activeFilter = chip.dataset.categoryFilter;
       repaint();
     });
   });
@@ -1107,18 +1111,18 @@ async function mountCabinet() {
 }
 
 function bottleListRowHTML(b) {
-  const window = (b.drink_window_start && b.drink_window_end)
-    ? `${b.drink_window_start}–${b.drink_window_end}`
+  const window = (b.peak_window_start && b.peak_window_end)
+    ? `${b.peak_window_start}–${b.peak_window_end}`
     : '';
   const subParts = [
-    escapeHtml(b.varietal),
-    b.vintage ? String(b.vintage) : '',
+    escapeHtml(b.spirit_type),
+    b.age_statement ? String(b.age_statement) : '',
     b.region ? escapeHtml(b.region) : '',
   ].filter(Boolean).join(' · ');
   return `
-    <article class="bottle-row" data-bottle-id="${b.id}" data-style="${escapeAttr(b.style || '')}" tabindex="0">
+    <article class="bottle-row" data-bottle-id="${b.id}" data-category="${escapeAttr(b.category || '')}" tabindex="0">
       <div class="bottle-row-main">
-        <h3 class="bottle-row-title">${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h3>
+        <h3 class="bottle-row-title">${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h3>
         <p class="bottle-row-sub muted">${subParts}</p>
       </div>
       <div class="bottle-row-aside">
@@ -1130,16 +1134,16 @@ function bottleListRowHTML(b) {
 }
 
 function bottleCardHTML(b) {
-  const window = (b.drink_window_start && b.drink_window_end)
-    ? `${b.drink_window_start}–${b.drink_window_end}`
+  const window = (b.peak_window_start && b.peak_window_end)
+    ? `${b.peak_window_start}–${b.peak_window_end}`
     : '—';
   return `
-    <article class="bottle-card" data-bottle-id="${b.id}" data-style="${escapeAttr(b.style || '')}" tabindex="0">
+    <article class="bottle-card" data-bottle-id="${b.id}" data-category="${escapeAttr(b.category || '')}" tabindex="0">
       <div class="bottle-photo placeholder">${escapeHtml((b.producer || '?')[0])}</div>
       <div class="bottle-meta">
-        <h3>${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h3>
+        <h3>${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h3>
         <p class="muted">
-          ${escapeHtml(b.varietal)}${b.vintage ? ` · ${b.vintage}` : ''}
+          ${escapeHtml(b.spirit_type)}${b.age_statement ? ` · ${b.age_statement}` : ''}
           ${b.region ? ` · ${escapeHtml(b.region)}` : ''}
         </p>
         <p class="meta-row">
@@ -1174,10 +1178,8 @@ async function mountAddBottle(bottleId) {
   const form = $('#add-bottle-form');
   if (!form) return;
 
-  const dl = $('#varietal-options');
-  if (dl) dl.innerHTML = VARIETAL_NAMES.map((v) => `<option value="${v}">`).join('');
-  const styleSel = form.style;
-  if (styleSel) styleSel.innerHTML = STYLES.map((s) => `<option value="${s}">${s}</option>`).join('');
+  const categorySel = form.category;
+  if (categorySel) categorySel.innerHTML = SPIRIT_CATEGORIES.map((c) => `<option value="${c.key}">${c.label}</option>`).join('');
 
   // Edit mode: prefill from existing row + change page heading.
   let existing = null;
@@ -1191,25 +1193,27 @@ async function mountAddBottle(bottleId) {
     if (heading) heading.textContent = 'Edit bottle';
     const submitBtn = form.querySelector('button[type="submit"]');
     if (submitBtn) submitBtn.textContent = 'Save changes';
-    for (const f of ['producer','wine_name','varietal','vintage','region','country','style','sweetness','body','quantity','storage_location','acquired_date','acquired_price','drink_window_start','drink_window_end','notes']) {
+    for (const f of ['producer','expression_name','spirit_type','category','sub_type','age_statement','release_year','region','country','proof','cask_type','cask_strength','single_barrel','finish','sweetness','intensity','quantity','storage_location','acquired_date','acquired_price','peak_window_start','peak_window_end','notes']) {
       const el = form.elements[f];
-      if (el && existing[f] != null) el.value = existing[f];
+      if (el && existing[f] != null) {
+        if (el.type === 'checkbox') el.checked = !!existing[f];
+        else el.value = existing[f];
+      }
     }
   }
 
   const updateWindowHint = () => {
-    const v = form.varietal.value;
-    const s = form.style.value;
-    const yr = parseInt(form.vintage.value, 10);
-    if (!yr) { $('#window-hint').textContent = ''; return; }
-    const { start, end } = suggestDrinkWindow({ varietal: v, style: s, vintage: yr });
-    $('#window-hint').textContent = (start && end)
-      ? `Auto: ${start}–${end} (override below if you disagree)`
-      : 'No window suggestion for this varietal/style';
-    if (start && !form.drink_window_start.value) form.drink_window_start.placeholder = start;
-    if (end && !form.drink_window_end.value) form.drink_window_end.placeholder = end;
+    const cat = form.category.value;
+    const sub = form.sub_type?.value || null;
+    const age = parseInt(form.age_statement?.value || '', 10);
+    const { tier, note } = suggestPeakWindow({ category: cat, sub_type: sub, age_statement: isFinite(age) ? age : null });
+    const hint = $('#window-hint');
+    if (!hint) return;
+    if (tier && tier !== 'unknown') hint.textContent = `Maturation tier: ${tier}. ${note || ''}`.trim();
+    else if (note) hint.textContent = note;
+    else hint.textContent = '';
   };
-  ['varietal','style','vintage'].forEach((n) => form[n].addEventListener('input', updateWindowHint));
+  ['category','sub_type','age_statement'].forEach((n) => form[n]?.addEventListener('input', updateWindowHint));
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1222,7 +1226,7 @@ async function mountAddBottle(bottleId) {
       } else {
         const created = await createBottle(input);
         location.hash = `#/bottle/${created.id}`;
-        // Background: ask the sommelier for enrichment so the detail page
+        // Background: ask the Master of Spirits for enrichment so the detail page
         // fills in tasting notes etc without the user clicking anything.
         autoEnrich(created.id);
       }
@@ -1231,7 +1235,7 @@ async function mountAddBottle(bottleId) {
 }
 
 // Tracks bottles currently being enriched so the detail view can show a
-// "Fetching sommelier notes…" banner instead of the Get-details button.
+// "Fetching Master of Spirits notes…" banner instead of the Get-details button.
 const enrichingBottles = new Set();
 // Records the most recent enrichment failure per bottle so the detail page
 // can offer a Retry instead of the spinner-forever bug from before.
@@ -1247,13 +1251,13 @@ async function autoEnrich(bottleId) {
     if (details) {
       await updateBottle(bottleId, { details });
     } else {
-      enrichFailures.set(bottleId, 'No details returned by sommelier.');
+      enrichFailures.set(bottleId, 'No details returned by Master of Spirits.');
     }
   } catch (err) {
     console.warn('[cabinet] autoEnrich failed:', err);
-    enrichFailures.set(bottleId, err?.message || 'Sommelier request failed.');
+    enrichFailures.set(bottleId, err?.message || 'Master of Spirits request failed.');
     if (location.hash === `#/bottle/${bottleId}`) {
-      showToast(`Couldn't fetch sommelier notes — tap Retry on the bottle.`);
+      showToast(`Couldn't fetch Master of Spirits notes — tap Retry on the bottle.`);
     }
   } finally {
     enrichingBottles.delete(bottleId);
@@ -1264,28 +1268,35 @@ async function autoEnrich(bottleId) {
 function collectBottleFields(fd) {
   return {
     producer: fd.get('producer').trim(),
-    wine_name: fd.get('wine_name')?.trim() || null,
-    varietal: fd.get('varietal').trim(),
-    vintage: numOrNull(fd.get('vintage')),
+    expression_name: fd.get('expression_name')?.trim() || null,
+    category: fd.get('category'),
+    sub_type: fd.get('sub_type')?.trim() || null,
+    spirit_type: fd.get('spirit_type')?.trim() || null,
+    age_statement: numOrNull(fd.get('age_statement')),
+    release_year: numOrNull(fd.get('release_year')),
     region: fd.get('region')?.trim() || null,
     country: fd.get('country')?.trim() || null,
-    style: fd.get('style'),
+    proof: numOrNull(fd.get('proof')),
+    cask_type: fd.get('cask_type')?.trim() || null,
+    cask_strength: fd.get('cask_strength') === 'on' || fd.get('cask_strength') === 'true',
+    single_barrel: fd.get('single_barrel') === 'on' || fd.get('single_barrel') === 'true',
+    finish: fd.get('finish')?.trim() || null,
     sweetness: fd.get('sweetness') || null,
-    body: numOrNull(fd.get('body')),
+    intensity: numOrNull(fd.get('intensity')),
     quantity: numOrNull(fd.get('quantity')) ?? 1,
     storage_location: fd.get('storage_location')?.trim() || null,
     acquired_date: fd.get('acquired_date') || null,
     acquired_price: numOrNull(fd.get('acquired_price')),
-    drink_window_start: numOrNull(fd.get('drink_window_start')),
-    drink_window_end: numOrNull(fd.get('drink_window_end')),
+    peak_window_start: numOrNull(fd.get('peak_window_start')),
+    peak_window_end: numOrNull(fd.get('peak_window_end')),
     notes: fd.get('notes')?.trim() || null,
   };
 }
 
-// ── Sommelier requests (pairing / flight / drink-now suggestions) ────
-// Animated SVG loader: tilted bottle pouring into a wine glass that
-// fills, holds, then drains. Inline SVG with SMIL animation so we
-// don't need any extra JS lifecycle.
+// ── Master-of-Spirits requests (pairing / flight / pour-tonight) ────
+// Animated SVG loader: tilted bottle pouring into a glass that fills,
+// holds, then drains. Inline SVG with SMIL animation so we don't need
+// any extra JS lifecycle.
 function pourLoaderHTML(msg = '') {
   const svg = `
     <svg class="pour-loader-svg" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
@@ -1377,11 +1388,11 @@ async function renderRecommendations(resultEl, response, opts = {}) {
         <p>${escapeHtml(r.reasoning || '')}</p>
       </div></article>`;
     }
-    return `<article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-style="${escapeAttr(bottle.style || '')}" tabindex="0">
+    return `<article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-category="${escapeAttr(bottle.category || '')}" tabindex="0">
       <div class="bottle-photo placeholder">${escapeHtml((bottle.producer || '?')[0])}</div>
       <div class="bottle-meta">
-        <h3>${escapeHtml(bottle.producer)}${bottle.wine_name ? ` <span class="muted">· ${escapeHtml(bottle.wine_name)}</span>` : ''}</h3>
-        <p class="muted">${escapeHtml(bottle.varietal)}${bottle.vintage ? ` · ${bottle.vintage}` : ''}</p>
+        <h3>${escapeHtml(bottle.producer)}${bottle.expression_name ? ` <span class="muted">· ${escapeHtml(bottle.expression_name)}</span>` : ''}</h3>
+        <p class="muted">${escapeHtml(bottle.spirit_type)}${bottle.age_statement ? ` · ${bottle.age_statement}` : ''}</p>
         <p><span class="qty">${escapeHtml(r.confidence || 'medium')}</span> · ${escapeHtml(r.reasoning || '')}</p>
       </div>
     </article>`;
@@ -1420,7 +1431,7 @@ function saveFlightFormHTML() {
         <button type="submit">Save flight &amp; plan</button>
         <button type="button" class="ghost" data-save-flight-cancel>Cancel</button>
       </div>
-      <p class="muted save-flight-hint">After saving we'll ask the sommelier to suggest food and prep — you can edit anything.</p>
+      <p class="muted save-flight-hint">After saving we'll ask the Master of Spirits to suggest food and prep — you can edit anything.</p>
     </form>
   </section>`;
 }
@@ -1683,13 +1694,30 @@ function mountPairing() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
-    await withBusySubmit(form, result, 'Asking your sommelier… (up to a couple of minutes)', async () => {
-      const { response } = await requestPairing({
-        dish: fd.get('dish').trim(),
-        guests: numOrNull(fd.get('guests')) ?? 2,
-        occasion: fd.get('occasion'),
-        constraints: fd.get('constraints')?.trim() || null,
-      });
+    // pairing.html uses a `kind` radio (food/cigar/occasion) to pick the
+    // request type. Default to food if missing for forward-compat.
+    const kind = (fd.get('kind') || 'food').trim();
+    await withBusySubmit(form, result, 'Asking the Master of Spirits… (up to a couple of minutes)', async () => {
+      const guests = numOrNull(fd.get('guests')) ?? 2;
+      const occasion = fd.get('occasion') || null;
+      const constraints = fd.get('constraints')?.trim() || null;
+      let response;
+      if (kind === 'cigar') {
+        ({ response } = await requestCigarPairing({
+          cigar: fd.get('cigar')?.trim() || fd.get('dish')?.trim(),
+          guests, occasion, constraints,
+        }));
+      } else if (kind === 'occasion') {
+        ({ response } = await requestOccasionPairing({
+          occasion: fd.get('occasion')?.trim() || fd.get('dish')?.trim(),
+          guests, constraints,
+        }));
+      } else {
+        ({ response } = await requestFoodPairing({
+          dish: fd.get('dish').trim(),
+          guests, occasion, constraints,
+        }));
+      }
       await renderRecommendations(result, response);
       cacheResult('pairing', result);
     });
@@ -1729,7 +1757,7 @@ function mountFlight() {
     extrasForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(extrasForm);
-      await withBusySubmit(extrasForm, extrasResult, 'Asking your sommelier what to add…', async () => {
+      await withBusySubmit(extrasForm, extrasResult, 'Asking your Master of Spirits what to add…', async () => {
         const { response } = await requestFlightExtras({
           themeHint: fd.get('theme_hint')?.trim() || null,
         });
@@ -1839,7 +1867,7 @@ async function pollForEnrichment(root, id) {
 }
 
 async function renderPlannedDetail(root, plan) {
-  // Pre-fetch each pick's bottle so we can show producer/varietal next to
+  // Pre-fetch each pick's bottle so we can show producer/spirit_type next to
   // its prep row. Tolerant of deleted bottles (unknown id renders muted).
   const picks = Array.isArray(plan.picks) ? plan.picks : [];
   const bottles = await Promise.all(picks.map(async (p) => {
@@ -1863,11 +1891,11 @@ async function renderPlannedDetail(root, plan) {
 
   const picksHTML = `<section><h2>Picks</h2>
     <div class="grid">${bottles.map(({ pick, bottle }) => bottle ? `
-      <article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-style="${escapeAttr(bottle.style || '')}" tabindex="0">
+      <article class="bottle-card" data-bottle-id="${escapeAttr(bottle.id)}" data-category="${escapeAttr(bottle.category || '')}" tabindex="0">
         <div class="bottle-photo placeholder">${escapeHtml((bottle.producer || '?')[0])}</div>
         <div class="bottle-meta">
-          <h3>${escapeHtml(bottle.producer)}${bottle.wine_name ? ` <span class="muted">· ${escapeHtml(bottle.wine_name)}</span>` : ''}</h3>
-          <p class="muted">${escapeHtml(bottle.varietal)}${bottle.vintage ? ` · ${bottle.vintage}` : ''}</p>
+          <h3>${escapeHtml(bottle.producer)}${bottle.expression_name ? ` <span class="muted">· ${escapeHtml(bottle.expression_name)}</span>` : ''}</h3>
+          <p class="muted">${escapeHtml(bottle.spirit_type)}${bottle.age_statement ? ` · ${bottle.age_statement}` : ''}</p>
           ${pick.reasoning ? `<p>${escapeHtml(pick.reasoning)}</p>` : ''}
         </div>
       </article>` : `<article class="bottle-card"><div class="bottle-meta">
@@ -1889,13 +1917,13 @@ async function renderPlannedDetail(root, plan) {
 
   const foodHTML = `<section class="planned-food"><h2>Food</h2>
     ${enrichmentPending
-      ? '<p class="muted">Sommelier is preparing food suggestions…</p>'
+      ? '<p class="muted">Master of Spirits is preparing food suggestions…</p>'
       : `<p class="muted food-hint">Options to choose from — keep what you'll serve, edit or delete the rest.</p>${renderFoodEditor(plan.food || [])}`}
   </section>`;
 
   const prepHTML = `<section class="planned-prep"><h2>Preparation</h2>
     ${enrichmentPending
-      ? '<p class="muted">Sommelier is preparing serving notes…</p>'
+      ? '<p class="muted">Master of Spirits is preparing serving notes…</p>'
       : renderPrepEditor(plan.prep || {}, bottles)}
   </section>`;
 
@@ -1909,7 +1937,7 @@ async function renderPlannedDetail(root, plan) {
   </section>`;
 
   const actionsHTML = `<section class="planned-actions">
-    <button type="button" class="ghost" data-action="reask"${enrichmentPending ? ' disabled' : ''}>Re-ask the sommelier</button>
+    <button type="button" class="ghost" data-action="reask"${enrichmentPending ? ' disabled' : ''}>Re-ask the Master of Spirits</button>
     <button type="button" class="ghost" data-action="delete">Delete this plan</button>
     <p class="error planned-error" hidden></p>
   </section>`;
@@ -2016,7 +2044,7 @@ function wirePlannedGuestSection(root, plan, link) {
     const btn = e.currentTarget;
     const original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Sommelier is writing the walkthrough…';
+    btn.textContent = 'Master of Spirits is writing the walkthrough…';
     showErr('');
     try {
       const fresh = await getPlannedFlight(plan.id);
@@ -2058,7 +2086,7 @@ function renderPrepEditor(prep, bottles) {
   const glassOf   = (id) => (prep.glassware || []).find((x) => x.bottle_id === id) || {};
   const rows = bottles.map(({ pick, bottle }) => {
     const id = pick.bottle_id;
-    const name = bottle ? `${bottle.producer}${bottle.wine_name ? ' · ' + bottle.wine_name : ''}` : 'Unknown bottle';
+    const name = bottle ? `${bottle.producer}${bottle.expression_name ? ' · ' + bottle.expression_name : ''}` : 'Unknown bottle';
     const decant = decantOf(id);
     const decantBadge = decant
       ? `<div class="prep-decant-badge">Decant${decant.why ? ` — ${escapeHtml(decant.why)}` : ''}</div>`
@@ -2073,7 +2101,7 @@ function renderPrepEditor(prep, bottles) {
       <td data-prep-label="Glass"><input type="text" data-prep-field="glassware" value="${escapeAttr(glassOf(id).type || '')}" placeholder="e.g. Burgundy" /></td>
     </tr>`;
   }).join('');
-  return `<p class="muted prep-hint">Sommelier suggestions — adjust the minutes if you'd rather pour differently. <em>Chill</em> = how long in the fridge before serving. <em>Breathe</em> = how long ahead to pull the cork so the wine can aerate (a heavier intervention than this is in the Decant note under the bottle).</p>
+  return `<p class="muted prep-hint">Master of Spirits suggestions — adjust to taste. <em>Chill</em> = how long in the fridge before serving. <em>Open early</em> = how long ahead to pour into the glass so the spirit can open up. <em>Water drops</em> = a few drops of cool water can soften high-proof spirits — see the bottle's notes.</p>
   <table class="prep-table">
     <thead><tr><th></th><th>Chill (min)</th><th>Breathe (min)</th><th>Glass</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="4" class="muted">No bottles to prep.</td></tr>'}</tbody>
@@ -2144,7 +2172,7 @@ function wirePlannedDetail(root, plan) {
   });
 
   // Prep — same recompute-and-patch pattern. Decanters are not editable
-  // in the UI (they're sommelier advice, not a user toggle), so we just
+  // in the UI (they're Master of Spirits advice, not a user toggle), so we just
   // pass through whatever was in the loaded plan.
   const originalDecanters = Array.isArray(plan.prep?.decanters) ? plan.prep.decanters : [];
   const collectPrep = () => {
@@ -2186,7 +2214,7 @@ function wirePlannedDetail(root, plan) {
     } catch (err) {
       showErr(err.message);
       btn.disabled = false;
-      btn.textContent = 'Re-ask the sommelier';
+      btn.textContent = 'Re-ask the Master of Spirits';
     }
   });
 
@@ -2200,42 +2228,46 @@ function wirePlannedDetail(root, plan) {
   });
 }
 
-// ── Drink-now ─────────────────────────────────────────────────────
+// ── Pour Tonight ──────────────────────────────────────────────────
 async function mountPourTonight() {
-  const dnForm = $('#drink-now-form');
-  const dnResult = $('#drink-now-result');
+  const dnForm = $('#pour-tonight-form');
+  const dnResult = $('#pour-tonight-result');
   if (dnForm) {
-    restoreResult('drink-now', dnResult);
+    restoreResult('pour-tonight', dnResult);
     dnForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(dnForm);
-      await withBusySubmit(dnForm, dnResult, 'Asking your sommelier…', async () => {
-        const { response } = await requestDrinkNow({ notes: fd.get('notes')?.trim() || null });
+      await withBusySubmit(dnForm, dnResult, 'Asking the Master of Spirits…', async () => {
+        const { response } = await requestPourTonight({ notes: fd.get('notes')?.trim() || null });
         await renderRecommendations(dnResult, response);
-        cacheResult('drink-now', dnResult);
+        cacheResult('pour-tonight', dnResult);
       });
     });
   }
-  const root = $('#drink-now-list');
+  const root = $('#pour-tonight-list');
   if (!root) return;
-  const yr = new Date().getFullYear();
   let bottles;
   try { bottles = await listBottles(); }
   catch (e) { root.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`; return; }
-  const buckets = { past: [], peak: [], entering: [] };
+  // Group by maturation tier from spirit-types.js. Bottles with no age
+  // statement skip the tier band (most spirits don't change in bottle).
+  const buckets = { peak: [], plateau: [], young: [], over: [] };
   for (const b of bottles) {
-    if (b.drink_window_start == null || b.drink_window_end == null) continue;
-    if (yr > b.drink_window_end) buckets.past.push(b);
-    else if (yr >= b.drink_window_start) buckets.peak.push(b);
-    else if (yr === b.drink_window_start - 1) buckets.entering.push(b);
+    const { tier } = suggestPeakWindow({
+      category: b.category,
+      sub_type: b.sub_type,
+      age_statement: b.age_statement,
+    });
+    if (buckets[tier]) buckets[tier].push(b);
   }
   const section = (title, list) => list.length
     ? `<section><h2>${title}</h2><div class="grid">${list.map(bottleCardHTML).join('')}</div></section>` : '';
   root.innerHTML = [
-    section('Past peak — drink soon', buckets.past),
-    section('In peak window', buckets.peak),
-    section('Entering peak this year', buckets.entering),
-  ].join('') || '<p class="muted">Nothing to flag right now.</p>';
+    section('In peak band', buckets.peak),
+    section('Plateau (still excellent)', buckets.plateau),
+    section('Young — may benefit from a longer cask', buckets.young),
+    section('Past peak — drink soon', buckets.over),
+  ].join('') || '<p class="muted">Nothing to flag right now — add bottles with an age statement to see tier groupings.</p>';
 }
 
 // ── Scan queue (background, in-memory) ────────────────────────────
@@ -2310,7 +2342,7 @@ function mountManage() {
     const promptEl = root.querySelector('[data-pane="capture"] .scan-prompt');
     promptEl.textContent = label === 'front'
       ? (intent === 'pour' ? 'Snap the front label to identify the bottle' : 'Snap the front label')
-      : 'Snap the back label (optional — alcohol, blend %, winemaker notes)';
+      : 'Snap the back label (optional — proof, mash bill, distiller notes)';
     try { stream = await startCamera($('#scan-video', root)); }
     catch (e) { showError(e.message); }
   };
@@ -2479,11 +2511,13 @@ function mountManage() {
       if (intent === 'pour') {
         // Pour stays single-shot: user wants the answer right now.
         const bottles = await listBottles();
-        const cellarSnapshot = bottles.map((b) => ({
-          id: b.id, producer: b.producer, wine_name: b.wine_name,
-          varietal: b.varietal, vintage: b.vintage, quantity: b.quantity,
+        const cabinetSnapshot = bottles.map((b) => ({
+          id: b.id, producer: b.producer, expression_name: b.expression_name,
+          spirit_type: b.spirit_type, category: b.category,
+          age_statement: b.age_statement, release_year: b.release_year,
+          quantity: b.quantity,
         }));
-        const req = await submitScanRequest({ intent, imagePaths, cellarSnapshot });
+        const req = await submitScanRequest({ intent, imagePaths, cabinetSnapshot });
         setStage('waiting');
         const response = await waitForScanResponse(req.id);
         await renderPourResult(response);
@@ -2522,33 +2556,42 @@ function mountManage() {
 }
 
 function renderAddReviewHTML(ext, details, imagePaths, narrative) {
-  const sel = (val, opts) => opts.map((o) => `<option value="${o}" ${ext[o] === val || val === o ? 'selected' : ''}>${o}</option>`).join('');
   return `
     <h2>Review extracted details</h2>
     <p class="muted">Confidence: <strong>${escapeHtml(ext.confidence || 'unknown')}</strong>. Edit any field before saving.</p>
     <form id="scan-add-form">
       <label>Producer<input name="producer" required value="${escapeAttr(ext.producer || '')}" /></label>
-      <label>Wine name<input name="wine_name" value="${escapeAttr(ext.wine_name || '')}" /></label>
-      <label>Varietal
-        <input name="varietal" required value="${escapeAttr(ext.varietal || '')}" list="varietal-options-scan" />
-        <datalist id="varietal-options-scan">${VARIETAL_NAMES.map((v) => `<option value="${v}">`).join('')}</datalist>
+      <label>Expression name<input name="expression_name" value="${escapeAttr(ext.expression_name || '')}" /></label>
+      <label>Category
+        <select name="category" required>${SPIRIT_CATEGORIES.map((c) => `<option value="${c.key}" ${ext.category === c.key ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
       </label>
-      <label>Vintage<input name="vintage" type="number" min="1900" max="2100" value="${ext.vintage ?? ''}" /></label>
+      <label>Sub-type<input name="sub_type" value="${escapeAttr(ext.sub_type || '')}" /></label>
+      <label>Spirit type (display)<input name="spirit_type" value="${escapeAttr(ext.spirit_type || '')}" placeholder="e.g. Single Malt Scotch" /></label>
+      <div class="row">
+        <label style="flex:1">Age statement (years)<input name="age_statement" type="number" min="0" max="100" value="${ext.age_statement ?? ''}" /></label>
+        <label style="flex:1">Release year<input name="release_year" type="number" min="1900" max="2100" value="${ext.release_year ?? ''}" /></label>
+      </div>
       <div class="row">
         <label style="flex:1">Region<input name="region" value="${escapeAttr(ext.region || '')}" /></label>
         <label style="flex:1">Country<input name="country" value="${escapeAttr(ext.country || '')}" /></label>
       </div>
       <div class="row">
-        <label style="flex:1">Style
-          <select name="style" required>${STYLES.map((s) => `<option ${ext.style === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
-        </label>
+        <label style="flex:1">Proof<input name="proof" type="number" min="0" max="200" step="0.1" value="${ext.proof ?? ''}" /></label>
+        <label style="flex:1">Cask type<input name="cask_type" value="${escapeAttr(ext.cask_type || '')}" placeholder="e.g. PX sherry" /></label>
+      </div>
+      <div class="row">
+        <label style="flex:1"><input type="checkbox" name="cask_strength" ${ext.cask_strength ? 'checked' : ''}/> Cask strength</label>
+        <label style="flex:1"><input type="checkbox" name="single_barrel" ${ext.single_barrel ? 'checked' : ''}/> Single barrel</label>
+      </div>
+      <label>Finish<input name="finish" value="${escapeAttr(ext.finish || '')}" placeholder="e.g. Madeira finish, 18mo" /></label>
+      <div class="row">
         <label style="flex:1">Sweetness
           <select name="sweetness">
             <option value="">—</option>
             ${SWEETNESS_OPTS.map((s) => `<option ${ext.sweetness === s ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
         </label>
-        <label style="flex:1">Body 1-5<input name="body" type="number" min="1" max="5" value="${ext.body ?? ''}" /></label>
+        <label style="flex:1">Intensity 1-5<input name="intensity" type="number" min="1" max="5" value="${ext.intensity ?? ''}" /></label>
       </div>
       <div class="row">
         <label style="flex:1">Quantity<input name="quantity" type="number" min="0" value="1" /></label>
@@ -2577,14 +2620,18 @@ function wireAddReviewForm(rootEl, imagePaths, details, onSaved = null) {
     input.details = details || null;
 
     try {
-      // Different vintage is treated as a different bottle (per spec).
+      // Different age statement / release year is treated as a different bottle.
       const dupe = await findDuplicate({
-        producer: input.producer, wine_name: input.wine_name,
-        vintage: input.vintage, varietal: input.varietal,
+        producer: input.producer, expression_name: input.expression_name,
+        age_statement: input.age_statement, release_year: input.release_year,
+        category: input.category,
       });
 
       if (dupe) {
-        const desc = `${dupe.producer}${dupe.wine_name ? ' · ' + dupe.wine_name : ''}${dupe.vintage ? ' ' + dupe.vintage : ''}`;
+        const ageBits = [];
+        if (dupe.age_statement) ageBits.push(`${dupe.age_statement}yr`);
+        if (dupe.release_year)  ageBits.push(`${dupe.release_year}`);
+        const desc = `${dupe.producer}${dupe.expression_name ? ' · ' + dupe.expression_name : ''}${ageBits.length ? ' ' + ageBits.join(' ') : ''}`;
         const merge = confirm(
           `You already have ${dupe.quantity}× of "${desc}".\n\nOK = add to existing (${dupe.quantity + 1} total).\nCancel = save as a separate bottle.`
         );
@@ -2616,11 +2663,11 @@ async function renderPourResultHTML(response) {
     if (b) {
       return `
         <h2>Found a match</h2>
-        <article class="bottle-card" data-style="${escapeAttr(b.style || '')}">
+        <article class="bottle-card" data-category="${escapeAttr(b.category || '')}">
           <div class="bottle-photo placeholder">${escapeHtml((b.producer || '?')[0])}</div>
           <div class="bottle-meta">
-            <h3>${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h3>
-            <p class="muted">${escapeHtml(b.varietal)}${b.vintage ? ` · ${b.vintage}` : ''} · ×${b.quantity}</p>
+            <h3>${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h3>
+            <p class="muted">${escapeHtml(b.spirit_type)}${b.age_statement ? ` · ${b.age_statement}` : ''} · ×${b.quantity}</p>
             <div class="actions">
               <button data-action="confirm-pour" data-bottle-id="${b.id}" ${b.quantity <= 0 ? 'disabled' : ''}>Pour this</button>
               <a href="#/cabinet" class="btn ghost" style="display:inline-block; padding:0.4rem 0.8rem; border:1px solid var(--surface-2); border-radius:var(--radius);">Cancel</a>
@@ -2636,7 +2683,7 @@ async function renderPourResultHTML(response) {
       let b = null;
       try { b = await getBottle(c.bottle_id); } catch {}
       const head = b
-        ? `<h3>${escapeHtml(b.producer)}${b.wine_name ? ` · ${escapeHtml(b.wine_name)}` : ''}${b.vintage ? ` · ${b.vintage}` : ''}</h3>`
+        ? `<h3>${escapeHtml(b.producer)}${b.expression_name ? ` · ${escapeHtml(b.expression_name)}` : ''}${b.age_statement ? ` · ${b.age_statement}` : ''}</h3>`
         : `<h3 class="muted">Unknown bottle (${escapeHtml(c.bottle_id)})</h3>`;
       return `<article class="bottle-card">
         <div class="bottle-meta">
@@ -2673,7 +2720,7 @@ async function mountBottleDetail(id) {
 }
 
 function renderBottleDetailHTML(b, frontUrl, backUrl) {
-  const w = (b.drink_window_start && b.drink_window_end) ? `${b.drink_window_start}–${b.drink_window_end}` : '—';
+  const w = (b.peak_window_start && b.peak_window_end) ? `${b.peak_window_start}–${b.peak_window_end}` : '—';
   const photos = (frontUrl || backUrl) ? `
     <div class="bottle-detail-photos">
       ${frontUrl ? `<img src="${escapeAttr(frontUrl)}" alt="Front label" data-zoom="${escapeAttr(frontUrl)}" />` : ''}
@@ -2683,29 +2730,29 @@ function renderBottleDetailHTML(b, frontUrl, backUrl) {
   const isEnriching = enrichingBottles.has(b.id);
   const enrichErr = enrichFailures.get(b.id);
   const detailsBtn = isEnriching
-    ? `<span class="muted" style="align-self:center; padding: 0.5rem 0;">Fetching sommelier notes…</span>`
+    ? `<span class="muted" style="align-self:center; padding: 0.5rem 0;">Fetching Master of Spirits notes…</span>`
     : enrichErr
-      ? `<button data-action="retry-enrich" class="ghost" title="${escapeAttr(enrichErr)}">Retry sommelier notes</button>`
+      ? `<button data-action="retry-enrich" class="ghost" title="${escapeAttr(enrichErr)}">Retry Master of Spirits notes</button>`
       : (b.details
           ? `<button data-action="refresh-details" class="ghost">Refresh details</button>`
           : `<button data-action="fetch-details" class="ghost">Get details</button>`);
 
   return `
-    <article class="bottle-detail-card" data-style="${escapeAttr(b.style || '')}">
+    <article class="bottle-detail-card" data-category="${escapeAttr(b.category || '')}">
       ${photos}
       <header>
-        <h1>${escapeHtml(b.producer)}${b.wine_name ? ` <span class="muted">· ${escapeHtml(b.wine_name)}</span>` : ''}</h1>
+        <h1>${escapeHtml(b.producer)}${b.expression_name ? ` <span class="muted">· ${escapeHtml(b.expression_name)}</span>` : ''}</h1>
         <p class="muted">
-          ${escapeHtml(b.varietal)}${b.vintage ? ` · ${b.vintage}` : ''}
+          ${escapeHtml(b.spirit_type)}${b.age_statement ? ` · ${b.age_statement}` : ''}
           ${b.region ? ` · ${escapeHtml(b.region)}` : ''}${b.country ? ` · ${escapeHtml(b.country)}` : ''}
         </p>
       </header>
       <dl class="bottle-stats">
         <dt>Quantity</dt><dd><span class="qty">×${b.quantity}</span></dd>
-        <dt>Style</dt><dd>${escapeHtml(b.style)}</dd>
+        <dt>Style</dt><dd>${escapeHtml(b.category)}</dd>
         ${b.sweetness ? `<dt>Sweetness</dt><dd>${escapeHtml(b.sweetness)}</dd>` : ''}
-        ${b.body ? `<dt>Body</dt><dd>${b.body}/5</dd>` : ''}
-        <dt>Drink window</dt><dd>${w}${b.drink_window_overridden ? ' <span class="muted">(custom)</span>' : ''}</dd>
+        ${b.intensity ? `<dt>Body</dt><dd>${b.intensity}/5</dd>` : ''}
+        <dt>Drink window</dt><dd>${w}${b.peak_window_overridden ? ' <span class="muted">(custom)</span>' : ''}</dd>
         ${b.storage_location ? `<dt>Storage</dt><dd>${escapeHtml(b.storage_location)}</dd>` : ''}
         ${b.acquired_date ? `<dt>Acquired</dt><dd>${escapeHtml(b.acquired_date)}</dd>` : ''}
         ${b.notes ? `<dt>Notes</dt><dd>${escapeHtml(b.notes)}</dd>` : ''}
@@ -2758,7 +2805,7 @@ function wireBottleDetail(root, bottle) {
     if (action === 'fetch-details' || action === 'refresh-details') {
       const btn = e.target.closest('button');
       const wasLabel = btn.textContent;
-      btn.disabled = true; btn.textContent = 'Asking your sommelier…';
+      btn.disabled = true; btn.textContent = 'Asking your Master of Spirits…';
       try {
         const response = await requestEnrichment(bottle.id);
         const details = response.extracted?.details || response.extracted || null;

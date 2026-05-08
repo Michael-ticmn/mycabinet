@@ -1,5 +1,5 @@
 // Owner-side share-link helpers. The token lives in the share_links
-// table; creation goes through cellar27_share_create() (SECURITY DEFINER)
+// table; creation goes through cabinet_share_create() (SECURITY DEFINER)
 // which atomically revokes any prior active link. Revoke is a plain RLS
 // UPDATE.
 
@@ -19,7 +19,7 @@ export async function getActiveShareLink() {
 }
 
 export async function createShareLink({ ttlHours, aiQuota }) {
-  const { data, error } = await sb.rpc('cellar27_share_create', {
+  const { data, error } = await sb.rpc('cabinet_share_create', {
     p_ttl_hours: ttlHours,
     p_ai_quota:  aiQuota,
   });

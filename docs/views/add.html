@@ -2,38 +2,55 @@
   <h1>Add bottle</h1>
   <p class="muted">Manual entry. (Tap <a href="#/manage">Manage</a> to scan a label instead.)</p>
   <form id="add-bottle-form">
-    <label>Producer<input name="producer" required /></label>
-    <label>Wine name (optional)<input name="wine_name" /></label>
-    <label>Varietal
-      <input name="varietal" list="varietal-options" required />
-      <datalist id="varietal-options"></datalist>
-    </label>
-    <label>Vintage<input name="vintage" type="number" min="1900" max="2100" /></label>
+    <label>Producer<input name="producer" required placeholder="distillery / house" /></label>
+    <label>Expression name (optional)<input name="expression_name" placeholder='e.g. "Old Forester 1920"' /></label>
 
     <div class="row">
-      <label style="flex:1">Region<input name="region" /></label>
+      <label style="flex:1">Category
+        <select name="category" required></select>
+      </label>
+      <label style="flex:1">Sub-type<input name="sub_type" placeholder="e.g. wheated, single_malt, anejo" /></label>
+    </div>
+
+    <label>Spirit type (display, optional)<input name="spirit_type" placeholder="e.g. Single Malt Scotch, Straight Bourbon" /></label>
+
+    <div class="row">
+      <label style="flex:1">Age statement (years)<input name="age_statement" type="number" min="0" max="100" placeholder="leave blank if NAS" /></label>
+      <label style="flex:1">Release year<input name="release_year" type="number" min="1900" max="2100" /></label>
+    </div>
+
+    <div class="row">
+      <label style="flex:1">Region<input name="region" placeholder="e.g. Speyside, Jalisco Highlands" /></label>
       <label style="flex:1">Country<input name="country" /></label>
     </div>
 
     <div class="row">
-      <label style="flex:1">Style
-        <select name="style" required></select>
-      </label>
+      <label style="flex:1">Proof<input name="proof" type="number" min="0" max="200" step="0.1" /></label>
+      <label style="flex:1">Cask type<input name="cask_type" placeholder="e.g. first-fill bourbon, PX sherry" /></label>
+    </div>
+
+    <div class="row">
+      <label style="flex:1"><input type="checkbox" name="cask_strength" /> Cask strength</label>
+      <label style="flex:1"><input type="checkbox" name="single_barrel" /> Single barrel</label>
+    </div>
+
+    <label>Finish<input name="finish" placeholder="e.g. Madeira finish, 18mo" /></label>
+
+    <div class="row">
       <label style="flex:1">Sweetness
         <select name="sweetness">
           <option value="">—</option>
-          <option value="bone_dry">bone_dry</option>
           <option value="dry">dry</option>
           <option value="off_dry">off_dry</option>
           <option value="sweet">sweet</option>
         </select>
       </label>
-      <label style="flex:1">Body (1–5)<input name="body" type="number" min="1" max="5" /></label>
+      <label style="flex:1">Intensity (1–5)<input name="intensity" type="number" min="1" max="5" /></label>
     </div>
 
     <div class="row">
       <label style="flex:1">Quantity<input name="quantity" type="number" min="0" value="1" /></label>
-      <label style="flex:1">Storage location<input name="storage_location" placeholder="e.g. rack A, slot 3" /></label>
+      <label style="flex:1">Storage location<input name="storage_location" placeholder="e.g. shelf A, slot 3" /></label>
     </div>
 
     <div class="row">
@@ -42,9 +59,9 @@
     </div>
 
     <fieldset class="row" style="border:1px solid var(--surface-2); padding:0.6rem; border-radius: var(--radius);">
-      <legend>Drink window (auto from varietal+vintage; override if you disagree)</legend>
-      <label style="flex:1">Start year<input name="drink_window_start" type="number" min="1900" max="2200" /></label>
-      <label style="flex:1">End year<input name="drink_window_end" type="number" min="1900" max="2200" /></label>
+      <legend>Peak window (years from acquisition; auto from category + age statement, override if you disagree)</legend>
+      <label style="flex:1">Start (years)<input name="peak_window_start" type="number" min="0" max="200" /></label>
+      <label style="flex:1">End (years)<input name="peak_window_end" type="number" min="0" max="200" /></label>
       <p id="window-hint" class="muted" style="flex-basis:100%; margin: 0.25rem 0 0;"></p>
     </fieldset>
 

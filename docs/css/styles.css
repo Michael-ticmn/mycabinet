@@ -165,16 +165,25 @@ input:focus, select:focus, textarea:focus {
   background: linear-gradient(135deg, var(--surface-2), var(--accent));
 }
 
-/* Wine-color tinted placeholders by style */
-.bottle-card[data-style="light_red"]    .bottle-photo.placeholder { background: linear-gradient(135deg, #6b2828, #c45050); color: #f5e6d3; }
-.bottle-card[data-style="medium_red"]   .bottle-photo.placeholder { background: linear-gradient(135deg, #4a1414, #8b1a1a); color: #f5e6d3; }
-.bottle-card[data-style="full_red"]     .bottle-photo.placeholder { background: linear-gradient(135deg, #2a0606, #5a1212); color: #f5e6d3; }
-.bottle-card[data-style="light_white"]  .bottle-photo.placeholder { background: linear-gradient(135deg, #d4cc88, #f0e8a8); color: #4a3818; }
-.bottle-card[data-style="full_white"]   .bottle-photo.placeholder { background: linear-gradient(135deg, #b89858, #d8b878); color: #3a2810; }
-.bottle-card[data-style="rose"]         .bottle-photo.placeholder { background: linear-gradient(135deg, #d07878, #e8a8a8); color: #5a2828; }
-.bottle-card[data-style="sparkling"]    .bottle-photo.placeholder { background: linear-gradient(135deg, #d8c878, #f0e0a0); color: #4a3818; }
-.bottle-card[data-style="dessert"]      .bottle-photo.placeholder { background: linear-gradient(135deg, #a8682a, #d09858); color: #2a1808; }
-.bottle-card[data-style="fortified"]    .bottle-photo.placeholder { background: linear-gradient(135deg, #4a1808, #8a3818); color: #f5e6d3; }
+/* Spirit-tinted placeholders by category */
+.bottle-card[data-category="bourbon"]                .bottle-photo.placeholder { background: linear-gradient(135deg, #5a2c0a, #b8741a); color: #f3e6cc; }
+.bottle-card[data-category="rye"]                    .bottle-photo.placeholder { background: linear-gradient(135deg, #4a2208, #a8651a); color: #f3e6cc; }
+.bottle-card[data-category="american_whiskey_other"] .bottle-photo.placeholder { background: linear-gradient(135deg, #5a3018, #b07840); color: #f3e6cc; }
+.bottle-card[data-category="scotch"]                 .bottle-photo.placeholder { background: linear-gradient(135deg, #3a2812, #8a6028); color: #f3e6cc; }
+.bottle-card[data-category="irish_whiskey"]          .bottle-photo.placeholder { background: linear-gradient(135deg, #2a4a28, #5a8a48); color: #f3e6cc; }
+.bottle-card[data-category="japanese_whisky"]        .bottle-photo.placeholder { background: linear-gradient(135deg, #3a2a3a, #786078); color: #f3e6cc; }
+.bottle-card[data-category="world_whisky"]           .bottle-photo.placeholder { background: linear-gradient(135deg, #4a3818, #98763a); color: #f3e6cc; }
+.bottle-card[data-category="tequila"]                .bottle-photo.placeholder { background: linear-gradient(135deg, #d8c888, #f0e0a8); color: #4a3818; }
+.bottle-card[data-category="mezcal"]                 .bottle-photo.placeholder { background: linear-gradient(135deg, #2a2818, #6a6038); color: #f3e6cc; }
+.bottle-card[data-category="agave_other"]            .bottle-photo.placeholder { background: linear-gradient(135deg, #b8a868, #e0d098); color: #2a2810; }
+.bottle-card[data-category="rum"]                    .bottle-photo.placeholder { background: linear-gradient(135deg, #2a1408, #6a3018); color: #f3e6cc; }
+.bottle-card[data-category="cognac"]                 .bottle-photo.placeholder { background: linear-gradient(135deg, #6a3a0a, #d68838); color: #2a1808; }
+.bottle-card[data-category="armagnac"]               .bottle-photo.placeholder { background: linear-gradient(135deg, #5a280a, #c47828); color: #2a1408; }
+.bottle-card[data-category="brandy_other"]           .bottle-photo.placeholder { background: linear-gradient(135deg, #5a2818, #b06840); color: #f3e6cc; }
+.bottle-card[data-category="gin"]                    .bottle-photo.placeholder { background: linear-gradient(135deg, #d8d8d0, #f0f0e8); color: #2a2818; }
+.bottle-card[data-category="vodka"]                  .bottle-photo.placeholder { background: linear-gradient(135deg, #e0e0e0, #f8f8f8); color: #2a2818; }
+.bottle-card[data-category="liqueur"]                .bottle-photo.placeholder { background: linear-gradient(135deg, #4a2848, #985888); color: #f3e6cc; }
+.bottle-card[data-category="other"]                  .bottle-photo.placeholder { background: linear-gradient(135deg, var(--surface-2), var(--accent)); color: var(--text); }
 .bottle-meta { padding: 0.75rem; display: grid; gap: 0.4rem; }
 .bottle-meta h3 { font-size: 1.1rem; }
 .meta-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin: 0; }
@@ -561,16 +570,25 @@ input:focus, select:focus, textarea:focus {
 .bottle-row-aside .qty { color: var(--highlight); font-weight: 600; }
 .bottle-row-pour { padding: 0.35rem 0.7rem; font-size: 0.85rem; flex-shrink: 0; }
 
-/* Per-style left-edge colors (mirrors the gradient palette on cards) */
-.bottle-row[data-style="light_red"]    { border-left-color: #c45050; }
-.bottle-row[data-style="medium_red"]   { border-left-color: #8b1a1a; }
-.bottle-row[data-style="full_red"]     { border-left-color: #5a1212; }
-.bottle-row[data-style="light_white"]  { border-left-color: #f0e8a8; }
-.bottle-row[data-style="full_white"]   { border-left-color: #d8b878; }
-.bottle-row[data-style="rose"]         { border-left-color: #e8a8a8; }
-.bottle-row[data-style="sparkling"]    { border-left-color: #f0e0a0; }
-.bottle-row[data-style="dessert"]      { border-left-color: #d09858; }
-.bottle-row[data-style="fortified"]    { border-left-color: #8a3818; }
+/* Per-category left-edge colors (mirrors the gradient palette on cards) */
+.bottle-row[data-category="bourbon"]                { border-left-color: #b8741a; }
+.bottle-row[data-category="rye"]                    { border-left-color: #a8651a; }
+.bottle-row[data-category="american_whiskey_other"] { border-left-color: #b07840; }
+.bottle-row[data-category="scotch"]                 { border-left-color: #8a6028; }
+.bottle-row[data-category="irish_whiskey"]          { border-left-color: #5a8a48; }
+.bottle-row[data-category="japanese_whisky"]        { border-left-color: #786078; }
+.bottle-row[data-category="world_whisky"]           { border-left-color: #98763a; }
+.bottle-row[data-category="tequila"]                { border-left-color: #f0e0a8; }
+.bottle-row[data-category="mezcal"]                 { border-left-color: #6a6038; }
+.bottle-row[data-category="agave_other"]            { border-left-color: #e0d098; }
+.bottle-row[data-category="rum"]                    { border-left-color: #6a3018; }
+.bottle-row[data-category="cognac"]                 { border-left-color: #d68838; }
+.bottle-row[data-category="armagnac"]               { border-left-color: #c47828; }
+.bottle-row[data-category="brandy_other"]           { border-left-color: #b06840; }
+.bottle-row[data-category="gin"]                    { border-left-color: #d8d8d0; }
+.bottle-row[data-category="vodka"]                  { border-left-color: #e0e0e0; }
+.bottle-row[data-category="liqueur"]                { border-left-color: #985888; }
+.bottle-row[data-category="other"]                  { border-left-color: var(--accent); }
 
 /* ── List/Card view toggle in cabinet toolbar ──────────────────── */
 .view-toggle {
@@ -598,7 +616,7 @@ input:focus, select:focus, textarea:focus {
 }
 .view-toggle-btn + .view-toggle-btn { border-left: 1px solid var(--surface-2); }
 
-/* ── Pour loader (sommelier waiting) ───────────────────────────── */
+/* ── Pour loader (Master of Spirits waiting) ───────────────────── */
 .pour-loader {
   display: flex;
   flex-direction: column;
@@ -1094,16 +1112,24 @@ body.guest-mode .topbar .userbox { display: none; }
   font-size: 0.95rem;
 }
 
-/* Wine-color tinted left edge per pour block, mirroring bottle-card. */
-.pour-block[data-style="light_red"]    { border-left: 4px solid #c45050; }
-.pour-block[data-style="medium_red"]   { border-left: 4px solid #8b1a1a; }
-.pour-block[data-style="full_red"]     { border-left: 4px solid #5a1212; }
-.pour-block[data-style="light_white"]  { border-left: 4px solid #d4cc88; }
-.pour-block[data-style="full_white"]   { border-left: 4px solid #b89858; }
-.pour-block[data-style="rose"]         { border-left: 4px solid #d07878; }
-.pour-block[data-style="sparkling"]    { border-left: 4px solid #d8c878; }
-.pour-block[data-style="dessert"]      { border-left: 4px solid #a8682a; }
-.pour-block[data-style="fortified"]    { border-left: 4px solid #8a3818; }
+/* Spirit-tinted left edge per pour block, mirroring bottle-card. */
+.pour-block[data-category="bourbon"]                { border-left: 4px solid #b8741a; }
+.pour-block[data-category="rye"]                    { border-left: 4px solid #a8651a; }
+.pour-block[data-category="american_whiskey_other"] { border-left: 4px solid #b07840; }
+.pour-block[data-category="scotch"]                 { border-left: 4px solid #8a6028; }
+.pour-block[data-category="irish_whiskey"]          { border-left: 4px solid #5a8a48; }
+.pour-block[data-category="japanese_whisky"]        { border-left: 4px solid #786078; }
+.pour-block[data-category="world_whisky"]           { border-left: 4px solid #98763a; }
+.pour-block[data-category="tequila"]                { border-left: 4px solid #f0e0a8; }
+.pour-block[data-category="mezcal"]                 { border-left: 4px solid #6a6038; }
+.pour-block[data-category="agave_other"]            { border-left: 4px solid #e0d098; }
+.pour-block[data-category="rum"]                    { border-left: 4px solid #6a3018; }
+.pour-block[data-category="cognac"]                 { border-left: 4px solid #d68838; }
+.pour-block[data-category="armagnac"]               { border-left: 4px solid #c47828; }
+.pour-block[data-category="brandy_other"]           { border-left: 4px solid #b06840; }
+.pour-block[data-category="gin"]                    { border-left: 4px solid #d8d8d0; }
+.pour-block[data-category="vodka"]                  { border-left: 4px solid #e0e0e0; }
+.pour-block[data-category="liqueur"]                { border-left: 4px solid #985888; }
 
 /* ──────────── Guest → Host channel ──────────── */
 
