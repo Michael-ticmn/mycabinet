@@ -1,39 +1,48 @@
-# mycellar (cellar27)
+# Cabinet — personal hard-spirits collection app
 
-Personal wine cellar app: catalog, pairings, tasting flights, drink-by tracking. Same architectural pattern as play27/grow27 — static frontend on GitHub Pages, Supabase for auth/data/storage, AI reasoning offloaded to Claude Code on the home-lab VM via a Supabase-Realtime-driven file-drop bridge.
+Catalog your bourbon, scotch, rye, tequila, mezcal, rum, cognac, and the rest of your hard-alcohol collection — with an AI **Master of Spirits** for pairings, tasting flights, and "what should I pour tonight" picks. Forked from [`mycellar`](https://github.com/Michael-ticmn/mycellar) (the wine-cellar version); architecture and patterns are reused, but the data model, taxonomy, AI persona, and Supabase project are independent.
 
 This repo is a monorepo:
 
 | Path | What | Status |
 |------|------|--------|
-| [`docs/`](docs/) | Static HTML/CSS/JS app, served by GitHub Pages | live |
-| [`watcher/`](watcher/) | Node service that bridges Supabase ↔ Claude Code | live |
-| [`supabase/migrations/`](supabase/migrations/) | SQL migrations for the Supabase project | 0002 applied |
+| [`docs/`](docs/) | Static HTML/CSS/JS PWA, will serve from GitHub Pages | local-only until repo split |
+| [`watcher/`](watcher/) | Node service that bridges Supabase ↔ direct Gemini API calls | provider-swapped (no Claude CLI) |
+| [`supabase/migrations/`](supabase/migrations/) | SQL migrations for the Cabinet Supabase project | 0001 (consolidated, ready to apply) |
 
 ## Architecture
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — one-page picture of how a request travels from phone → Supabase → laptop → Claude → back
-- [docs-pdf/architecture.pdf](docs-pdf/architecture.pdf) — colored, printable single-page PDF (cellar27 palette + SVG diagram). Source: [docs-pdf/architecture.html](docs-pdf/architecture.html); regenerate with [`docs-pdf/build.sh`](docs-pdf/build.sh).
+- [ARCHITECTURE.md](ARCHITECTURE.md) — one-page picture of how a request travels from phone → Supabase → watcher → Gemini → back
+- [docs-pdf/architecture.pdf](docs-pdf/architecture.pdf) — colored, printable single-page PDF. Source: [docs-pdf/architecture.html](docs-pdf/architecture.html); regenerate with [`docs-pdf/build.sh`](docs-pdf/build.sh) once Cabinet copy is settled.
 
 ## Planning docs
 
-- [STRATEGY.md](STRATEGY.md) — direction, decisions, constraints
-- [BUILD_SPEC.md](BUILD_SPEC.md) — technical plan; what to build, in what order
-- [BUILD_LOG.md](BUILD_LOG.md) — append-only log of work sessions and decisions
+- [PLAN.md](PLAN.md) — fork plan from mycellar, naming map, taxonomy, schema deltas
+- [STRATEGY.md](STRATEGY.md) — direction, decisions, constraints (legacy mycellar text; partial rebrand)
+- [BUILD_SPEC.md](BUILD_SPEC.md) — technical plan (legacy mycellar text; partial rebrand)
 - [CURRENT_STATE.md](CURRENT_STATE.md) — snapshot of where things stand
+- [BUILD_LOG.md](BUILD_LOG.md) — append-only log of mycellar's work sessions, kept for history
 - [HANDOFF_QUEUE.md](HANDOFF_QUEUE.md) — pending tasks between Chat / Code / owner
+
+## Spirit taxonomy
+
+Categories, sub-types, regions, and per-category maturation guidance live in [`docs/js/spirit-types.js`](docs/js/spirit-types.js). Categories: bourbon, rye, scotch, irish_whiskey, japanese_whisky, world_whisky, tequila, mezcal, agave_other, rum, cognac, armagnac, brandy_other, gin, vodka, liqueur, american_whiskey_other, other. The same module powers the Add form, filter chips, and the Pour Tonight tier groupings.
+
+## AI provider
+
+Cabinet calls the Google Gemini API directly (the watcher's old `claude --print` spawn is gone). On Gemini failure or empty completion, it falls back through OpenRouter free-tier models. See [`watcher/src/llm.js`](watcher/src/llm.js) and [`watcher/.env.example`](watcher/.env.example).
 
 ## Where to start
 
-If you're picking this up: read STRATEGY.md, then BUILD_SPEC.md, then check CURRENT_STATE.md for what's queued next. The handoff pattern is: Chat decides → Code executes → BUILD_LOG entry → CURRENT_STATE flips.
+If you're picking this up: read PLAN.md, then this README, then CURRENT_STATE.md for what's queued next. To run locally you need a Cabinet Supabase project (separate from cellar27); apply [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), drop the URL + anon key into [`docs/config.local.js`](docs/config.local.js) and the URL + service role key into [`watcher/.env`](watcher/.env.example), seed [`cabinet_allowed_users`](supabase/migrations/0001_init.sql) with your auth user id, and start the watcher.
 
 ## Building the frontend bundle
 
-`docs/js/app.js` and its imports are bundled and minified into [`docs/js/dist/app.bundle.js`](docs/js/dist/app.bundle.js) for production. Rebuild after editing any `docs/js/*.js` file:
+`docs/js/app.js` and its imports are bundled and minified into [`docs/js/dist/app.bundle.js`](docs/js/dist/app.bundle.js). Rebuild after editing any `docs/js/*.js` file:
 
 ```
 npm install            # one-time, installs esbuild
 npm run build:docs     # bundles + minifies into docs/js/dist/
 ```
 
-Bump [`docs/version.js`](docs/version.js) so the service worker invalidates the old cache. The committed bundle is what GitHub Pages serves — there is no CI build step.
+Bump [`docs/version.js`](docs/version.js) so the service worker invalidates the old cache. The committed bundle is what GitHub Pages will serve — there is no CI build step.
